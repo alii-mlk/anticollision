@@ -104,7 +104,7 @@
 
     <!-- ===== DRONE 1 ===== -->
     <include>
-      <uri>/Users/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3 uav/6</uri>
+      <uri>/home/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3%20uav/6</uri>
       <name>drone_1</name>
       <pose>0 -3 0.3 0 0 0</pose>
 
@@ -226,7 +226,7 @@
 
     <!-- ===== DRONE 2 ===== -->
     <include>
-      <uri>/Users/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3 uav/6</uri>
+      <uri>/home/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3%20uav/6</uri>
       <name>drone_2</name>
       <pose>0 0 0.3 0 0 0</pose>
 
@@ -348,7 +348,7 @@
 
     <!-- ===== DRONE 3 ===== -->
     <include>
-      <uri>/Users/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3 uav/6</uri>
+      <uri>/home/ali/.gz/fuel/fuel.gazebosim.org/openrobotics/models/x3%20uav/6</uri>
       <name>drone_3</name>
       <pose>0 3 0.3 0 0 0</pose>
 

@@ -1,0 +1,211 @@
+[INFO] [launch]: All log files can be found below /home/ali/.ros/log/2026-07-14-14-08-29-008927-ali-29688
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [controller_server-1]: process started with pid [29692]
+[INFO] [planner_server-2]: process started with pid [29693]
+[INFO] [behavior_server-3]: process started with pid [29694]
+[INFO] [bt_navigator-4]: process started with pid [29695]
+[INFO] [lifecycle_manager-5]: process started with pid [29696]
+[lifecycle_manager-5] [INFO] [1784030909.119140546] [lifecycle_manager_navigation]: Creating
+[lifecycle_manager-5] [INFO] [1784030909.126759090] [lifecycle_manager_navigation]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[planner_server-2] [INFO] [1784030909.160631891] [planner_server]: 
+[planner_server-2] 	planner_server lifecycle node launched. 
+[planner_server-2] 	Waiting on external lifecycle transitions to activate
+[planner_server-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-2] [INFO] [1784030909.161535154] [planner_server]: Creating
+[bt_navigator-4] [INFO] [1784030909.180473486] [bt_navigator]: 
+[bt_navigator-4] 	bt_navigator lifecycle node launched. 
+[bt_navigator-4] 	Waiting on external lifecycle transitions to activate
+[bt_navigator-4] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[bt_navigator-4] [INFO] [1784030909.182940579] [bt_navigator]: Creating
+[controller_server-1] [INFO] [1784030909.185717097] [controller_server]: 
+[controller_server-1] 	controller_server lifecycle node launched. 
+[planner_server-2] [INFO] [1784030909.186106489] [global_costmap.global_costmap]: 
+[planner_server-2] 	global_costmap lifecycle node launched. 
+[planner_server-2] 	Waiting on external lifecycle transitions to activate
+[planner_server-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[controller_server-1] 	Waiting on external lifecycle transitions to activate
+[controller_server-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-2] [INFO] [1784030909.187294331] [global_costmap.global_costmap]: Creating Costmap
+[controller_server-1] [INFO] [1784030909.191155216] [controller_server]: Creating controller server
+[controller_server-1] [INFO] [1784030909.201721860] [local_costmap.local_costmap]: 
+[controller_server-1] 	local_costmap lifecycle node launched. 
+[controller_server-1] 	Waiting on external lifecycle transitions to activate
+[controller_server-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[controller_server-1] [INFO] [1784030909.201895113] [local_costmap.local_costmap]: Creating Costmap
+[behavior_server-3] [INFO] [1784030909.202312065] [behavior_server]: 
+[behavior_server-3] 	behavior_server lifecycle node launched. 
+[behavior_server-3] 	Waiting on external lifecycle transitions to activate
+[behavior_server-3] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[lifecycle_manager-5] [INFO] [1784030909.324829706] [lifecycle_manager_navigation]: [34m[1mStarting managed nodes bringup...[0m[0m
+[lifecycle_manager-5] [INFO] [1784030909.325125978] [lifecycle_manager_navigation]: [34m[1mConfiguring controller_server[0m[0m
+[controller_server-1] [INFO] [1784030909.470989738] [controller_server]: Configuring controller interface
+[controller_server-1] [INFO] [1784030909.471011661] [controller_server]: getting progress checker plugins..
+[controller_server-1] [INFO] [1784030909.471069704] [controller_server]: getting goal checker plugins..
+[controller_server-1] [INFO] [1784030909.471097974] [controller_server]: Controller frequency set to 10.0000Hz
+[controller_server-1] [INFO] [1784030909.471116849] [local_costmap.local_costmap]: Configuring
+[controller_server-1] [INFO] [1784030909.475648280] [local_costmap.local_costmap]: Using plugin "obstacle_layer"
+[controller_server-1] [INFO] [1784030909.479097308] [local_costmap.local_costmap]: Subscribed to Topics: scan
+[controller_server-1] [INFO] [1784030909.482547838] [local_costmap.local_costmap]: Initialized plugin "obstacle_layer"
+[controller_server-1] [INFO] [1784030909.482560115] [local_costmap.local_costmap]: Using plugin "inflation_layer"
+[controller_server-1] [INFO] [1784030909.483052857] [local_costmap.local_costmap]: Initialized plugin "inflation_layer"
+[controller_server-1] [INFO] [1784030909.497378414] [controller_server]: Created progress_checker : progress_checker of type nav2_controller::SimpleProgressChecker
+[controller_server-1] [INFO] [1784030909.498263846] [controller_server]: Controller Server has progress_checker  progress checkers available.
+[controller_server-1] [INFO] [1784030909.498841482] [controller_server]: Created goal checker : goal_checker of type nav2_controller::SimpleGoalChecker
+[controller_server-1] [INFO] [1784030909.499436572] [controller_server]: Controller Server has goal_checker  goal checkers available.
+[controller_server-1] [INFO] [1784030909.502939259] [controller_server]: Created controller : FollowPath of type dwb_core::DWBLocalPlanner
+[controller_server-1] [INFO] [1784030909.503478602] [controller_server]: Setting transform_tolerance to 0.200000
+[controller_server-1] [INFO] [1784030909.513877130] [controller_server]: Using critic "Oscillation" (dwb_critics::OscillationCritic)
+[controller_server-1] [INFO] [1784030909.514132897] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.514185553] [controller_server]: Using critic "BaseObstacle" (dwb_critics::BaseObstacleCritic)
+[controller_server-1] [INFO] [1784030909.514266939] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.514330996] [controller_server]: Using critic "GoalAlign" (dwb_critics::GoalAlignCritic)
+[controller_server-1] [INFO] [1784030909.514511389] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.514561958] [controller_server]: Using critic "PathAlign" (dwb_critics::PathAlignCritic)
+[controller_server-1] [INFO] [1784030909.514731286] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.514803318] [controller_server]: Using critic "PathDist" (dwb_critics::PathDistCritic)
+[controller_server-1] [INFO] [1784030909.514992940] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.515042549] [controller_server]: Using critic "GoalDist" (dwb_critics::GoalDistCritic)
+[controller_server-1] [INFO] [1784030909.515155337] [controller_server]: Critic plugin initialized
+[controller_server-1] [INFO] [1784030909.515162185] [controller_server]: Controller Server has FollowPath  controllers available.
+[lifecycle_manager-5] [INFO] [1784030909.519017641] [lifecycle_manager_navigation]: [34m[1mConfiguring planner_server[0m[0m
+[planner_server-2] [INFO] [1784030910.244138811] [planner_server]: Configuring
+[planner_server-2] [INFO] [1784030910.244299670] [global_costmap.global_costmap]: Configuring
+[planner_server-2] [INFO] [1784030910.270080605] [global_costmap.global_costmap]: Using plugin "obstacle_layer"
+[planner_server-2] [INFO] [1784030910.276000490] [global_costmap.global_costmap]: Subscribed to Topics: scan
+[planner_server-2] [INFO] [1784030910.280379586] [global_costmap.global_costmap]: Initialized plugin "obstacle_layer"
+[planner_server-2] [INFO] [1784030910.280398289] [global_costmap.global_costmap]: Using plugin "inflation_layer"
+[planner_server-2] [INFO] [1784030910.281505765] [global_costmap.global_costmap]: Initialized plugin "inflation_layer"
+[planner_server-2] [INFO] [1784030910.309330648] [planner_server]: Created global planner plugin GridBased of type nav2_navfn_planner::NavfnPlanner
+[planner_server-2] [INFO] [1784030910.309611035] [planner_server]: Configuring plugin GridBased of type NavfnPlanner
+[planner_server-2] [INFO] [1784030910.311013092] [planner_server]: Planner Server has GridBased  planners available.
+[lifecycle_manager-5] [INFO] [1784030910.323142266] [lifecycle_manager_navigation]: [34m[1mConfiguring behavior_server[0m[0m
+[behavior_server-3] [INFO] [1784030910.323802067] [behavior_server]: Configuring
+[behavior_server-3] [INFO] [1784030910.333337375] [behavior_server]: Creating behavior plugin spin of type nav2_behaviors::Spin
+[behavior_server-3] [INFO] [1784030910.335191950] [behavior_server]: Creating behavior plugin backup of type nav2_behaviors::BackUp
+[behavior_server-3] [INFO] [1784030910.336544117] [behavior_server]: Creating behavior plugin wait of type nav2_behaviors::Wait
+[behavior_server-3] [INFO] [1784030910.343063392] [behavior_server]: Configuring spin
+[behavior_server-3] [INFO] [1784030910.348633128] [behavior_server]: Configuring backup
+[behavior_server-3] [INFO] [1784030910.352156244] [behavior_server]: Configuring wait
+[lifecycle_manager-5] [INFO] [1784030910.358932819] [lifecycle_manager_navigation]: [34m[1mConfiguring bt_navigator[0m[0m
+[bt_navigator-4] [INFO] [1784030910.359524361] [bt_navigator]: Configuring
+[bt_navigator-4] [INFO] [1784030910.368171584] [bt_navigator]: Creating navigator id navigate_to_pose of type nav2_bt_navigator::NavigateToPoseNavigator
+[bt_navigator-4] [WARN] [1784030910.373307130] [bt_navigator]: Error_code parameters were not set. Using default values of: follow_path_error_code compute_path_error_code
+[bt_navigator-4] Make sure these match your BT and there are not other sources of error codes youreported to your application
+[bt_navigator-4] [INFO] [1784030910.433682675] [bt_navigator]: Creating navigator id navigate_through_poses of type nav2_bt_navigator::NavigateThroughPosesNavigator
+[lifecycle_manager-5] [INFO] [1784030910.453197960] [lifecycle_manager_navigation]: [34m[1mActivating controller_server[0m[0m
+[controller_server-1] [INFO] [1784030910.453859014] [controller_server]: Activating
+[controller_server-1] [INFO] [1784030910.453949359] [local_costmap.local_costmap]: Activating
+[controller_server-1] [INFO] [1784030910.453964346] [local_costmap.local_costmap]: Checking transform
+[controller_server-1] [INFO] [1784030910.454050600] [local_costmap.local_costmap]: Timed out waiting for transform from base_link to odom to become available, tf error: Invalid frame ID "odom" passed to canTransform argument target_frame - frame does not exist
+[controller_server-1] [INFO] [1784030910.954365107] [local_costmap.local_costmap]: start
+[controller_server-1] [INFO] [1784030911.157520567] [controller_server]: Creating bond (controller_server) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1784030911.554643775] [lifecycle_manager_navigation]: Server controller_server connected with bond.
+[lifecycle_manager-5] [INFO] [1784030911.554688814] [lifecycle_manager_navigation]: [34m[1mActivating planner_server[0m[0m
+[planner_server-2] [INFO] [1784030911.557079172] [planner_server]: Activating
+[planner_server-2] [INFO] [1784030911.557107932] [global_costmap.global_costmap]: Activating
+[planner_server-2] [INFO] [1784030911.557112983] [global_costmap.global_costmap]: Checking transform
+[planner_server-2] [INFO] [1784030911.557215082] [global_costmap.global_costmap]: start
+[planner_server-2] [INFO] [1784030911.759688975] [planner_server]: Activating plugin GridBased of type NavfnPlanner
+[planner_server-2] [INFO] [1784030911.761831516] [planner_server]: Creating bond (planner_server) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1784030911.869629113] [lifecycle_manager_navigation]: Server planner_server connected with bond.
+[lifecycle_manager-5] [INFO] [1784030911.869659334] [lifecycle_manager_navigation]: [34m[1mActivating behavior_server[0m[0m
+[behavior_server-3] [INFO] [1784030911.870904019] [behavior_server]: Activating
+[behavior_server-3] [INFO] [1784030911.870924138] [behavior_server]: Activating spin
+[behavior_server-3] [INFO] [1784030911.870939123] [behavior_server]: Activating backup
+[behavior_server-3] [INFO] [1784030911.870945343] [behavior_server]: Activating wait
+[behavior_server-3] [INFO] [1784030911.870952522] [behavior_server]: Creating bond (behavior_server) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1784030911.980927472] [lifecycle_manager_navigation]: Server behavior_server connected with bond.
+[lifecycle_manager-5] [INFO] [1784030911.980975141] [lifecycle_manager_navigation]: [34m[1mActivating bt_navigator[0m[0m
+[bt_navigator-4] [INFO] [1784030911.982260022] [bt_navigator]: Activating
+[bt_navigator-4] [INFO] [1784030912.073191820] [bt_navigator]: Creating bond (bt_navigator) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1784030912.181809322] [lifecycle_manager_navigation]: Server bt_navigator connected with bond.
+[lifecycle_manager-5] [INFO] [1784030912.181833695] [lifecycle_manager_navigation]: [34m[1mManaged nodes are active[0m[0m
+[lifecycle_manager-5] [INFO] [1784030912.181838244] [lifecycle_manager_navigation]: [34m[1mCreating bond timer...[0m[0m
+[bt_navigator-4] [INFO] [1784030923.675417314] [bt_navigator]: Begin navigating from current location (0.19, -0.22) to (8.00, 0.00)
+[controller_server-1] [INFO] [1784030923.699436726] [controller_server]: Received a goal, begin computing control effort.
+[controller_server-1] [WARN] [1784030923.700090097] [controller_server]: No goal checker was specified in parameter 'current_goal_checker'. Server will use only plugin loaded goal_checker . This warning will appear once.
+[controller_server-1] [WARN] [1784030923.700100688] [controller_server]: No progress checker was specified in parameter 'current_progress_checker'. Server will use only plugin loaded progress_checker . This warning will appear once.
+[controller_server-1] [INFO] [1784030924.802304445] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030925.802306040] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030926.802285104] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030927.802298189] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030928.902406914] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030929.902308049] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030930.902550485] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030931.902297647] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030933.002287584] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030934.002455374] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030935.002361017] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030936.002380161] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030937.102472660] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030938.102298014] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030939.102300976] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030940.102330833] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030941.202374068] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030942.202706439] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030943.202288264] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030943.322618272] [controller_server]: Reached the goal!
+[bt_navigator-4] [INFO] [1784030943.347558017] [bt_navigator]: Goal succeeded
+[bt_navigator-4] [INFO] [1784030958.091871196] [bt_navigator]: Begin navigating from current location (8.19, -0.12) to (0.00, 0.00)
+[controller_server-1] [INFO] [1784030958.114387695] [controller_server]: Received a goal, begin computing control effort.
+[controller_server-1] [INFO] [1784030959.226625144] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030960.226611802] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030961.226588665] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030962.226611155] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030963.326612848] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030964.326594721] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030965.326590395] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030966.326585231] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030967.426583749] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030968.426571906] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030969.426698616] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030970.426567503] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030971.526615794] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030972.526597163] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030973.526576649] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030974.626561592] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030975.626596298] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030976.626628806] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030977.045571654] [controller_server]: Reached the goal!
+[bt_navigator-4] [INFO] [1784030977.069714706] [bt_navigator]: Goal succeeded
+[bt_navigator-4] [INFO] [1784030994.007852718] [bt_navigator]: Begin navigating from current location (0.02, 0.22) to (8.00, 0.00)
+[controller_server-1] [INFO] [1784030994.031628446] [controller_server]: Received a goal, begin computing control effort.
+[planner_server-2] [INFO] [1784030994.481176769] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 1302.500 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784030994.481785093] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1302.500 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784030995.133692755] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030996.133591047] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030997.133630306] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030998.133608307] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784030999.233703502] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031000.233616882] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031001.233578737] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031002.233625601] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031003.333609421] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031004.333553064] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031005.333612315] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031006.333637224] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031007.433565038] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031008.433563782] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031009.433612548] [controller_server]: Passing new path to controller.
+[planner_server-2] [INFO] [1784031010.398886795] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 1318.300 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031010.433718063] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031011.533682803] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031012.533597660] [controller_server]: Passing new path to controller.
+[controller_server-1] [INFO] [1784031012.648448358] [controller_server]: Reached the goal!
+[bt_navigator-4] [INFO] [1784031012.668307187] [bt_navigator]: Goal succeeded
+[controller_server-1] [INFO] [1784031068.416590853] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1376.100 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784031082.915448170] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 1390.600 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031166.651052084] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1474.100 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031183.679065902] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1491.100 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784031185.580291213] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 1493.000 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031279.399433964] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1585.800 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031345.067346396] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1647.600 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031465.414303953] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1762.400 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031614.131410120] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1910.000 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784031681.428513982] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 1977.100 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784031688.074270273] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 1983.700 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784031974.843234476] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 2267.800 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784032036.134810845] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 2328.700 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784032131.586760576] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 2423.200 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[planner_server-2] [INFO] [1784032201.132388441] [global_costmap.global_costmap]: Message Filter dropping message: frame 'base_link' at time 2492.300 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[controller_server-1] [INFO] [1784032214.045455844] [local_costmap.local_costmap]: Message Filter dropping message: frame 'base_link' at time 2505.200 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
