@@ -30,25 +30,80 @@ nav2/
   launch_nav2.sh              # runs the launch file (logs to logs/nav2.txt)
   send_nav2_goal.sh           # sends NavigateToPose goal, default (8,0); logs to logs/goal_<time>.txt
   test_move_drone.sh          # sanity check: drives the drone via /cmd_vel directly, bypassing Nav2
+  view.sh + drone_view.rviz   # RViz2 view: odometry trail, lidar hits, costmap, planned path
+  view_gazebo.sh              # attaches the Gazebo GUI to the running headless server
   logs/                       # all terminals and runs tee their output here (gitignored candidate)
   old/                        # superseded prototype (dead-reckoning bridge)
 ```
 
-## Running
+## Running (step by step)
+
+All commands from the `nav2/` directory.
+
+**1. Start the simulation + bridges:**
 
 ```bash
-cd nav2
-
-./start_drone_stack.sh        # 1. Gazebo + bridges (6 terminals; drone auto-armed with retries)
-./launch_nav2.sh              # 2. wait for "Managed nodes are active"
-./send_nav2_goal.sh           # 3. goal (8,0) — straight line would pass through the wall
-./send_nav2_goal.sh 0 0       # fly back, rounding the wall again
-./stop_drone_stack.sh         # teardown
+./start_drone_stack.sh
 ```
 
-The goal terminal streams feedback and ends with `SUCCEEDED`. Trajectory metrics
-(path length, path/Euclidean ratio) can be computed from `logs/goal_*.txt`,
-which record the full feedback stream of every run.
+Opens 6 terminals: the Gazebo server (headless), the odometry/clock and cmd_vel
+bridges, the odom/TF republisher, the virtual lidar, and an arming loop that
+enables the drone's motors (retries for ~20 s). Wait until the "3 Drone Odom TF
+Bridge" terminal starts printing `Publishing /odom: ...` lines.
+
+**2. Start Nav2 (new terminal):**
+
+```bash
+./launch_nav2.sh
+```
+
+Wait for `Managed nodes are active` — Nav2 is ready. Leave this running.
+
+**3. Send a navigation goal (new terminal):**
+
+```bash
+./send_nav2_goal.sh           # default goal (8,0): straight line would cross the wall
+./send_nav2_goal.sh 0 0       # custom goal: fly back, rounding the wall again
+```
+
+The terminal streams feedback (distance remaining, recoveries) and ends with
+`Goal finished with status: SUCCEEDED`. Every run is also logged to
+`logs/goal_<time>.txt` (full feedback stream — the source for trajectory metrics
+like path length and path/Euclidean ratio).
+
+**4. Teardown:**
+
+```bash
+./stop_drone_stack.sh         # kills Gazebo + bridges; Ctrl+C the Nav2 terminal
+```
+
+## Visualization
+
+Two independent viewers; both attach to the running stack and can be opened or
+closed at any time without affecting the simulation.
+
+**RViz (recommended — shows what Nav2 "thinks"):**
+
+```bash
+./view.sh
+```
+
+Preconfigured view (`drone_view.rviz`): odometry arrow trail (the flown path),
+red lidar points tracing the wall, the global costmap with its inflation band,
+and the green planned path. The toolbar's *2D Goal Pose* tool sends goals by
+clicking in the view (bypasses the logging of `send_nav2_goal.sh`).
+
+**Gazebo GUI (shows the simulated world itself):**
+
+```bash
+./view_gazebo.sh
+```
+
+Attaches Gazebo's 3D viewport to the headless server — you see the actual drone
+model, the wall, and the ground plane. Works out of the box on real GPUs / WSL2.
+In the VMware-on-Apple-Silicon VM it requires "Accelerate 3D Graphics" to be
+**disabled** (see gotchas below); expect low framerates there (software
+rendering).
 
 ## Architecture
 
@@ -88,6 +143,14 @@ swapped back in.
 - ROS `setup.bash` breaks under `set -u`; scripts source it first.
 - Scripts derive their working directory from their own location — do not hardcode
   absolute paths (this repo is used through a VM shared folder).
+- VMware on Apple Silicon: keep "Accelerate 3D Graphics" **disabled**. Counter-
+  intuitively, enabling it makes the Gazebo GUI hang (buggy SVGA3D driver, and Mesa
+  then refuses the software fallback); disabled, the GUI renders via llvmpipe —
+  slow but stable. Rendering-based sensors (gpu_lidar) work in *neither* mode,
+  hence the virtual lidar. On real GPUs / WSL2 none of this applies.
+- RViz on the SVGA3D driver may log a GLSL link error for `indexed_8bit_image`
+  (the costmap display shader). Harmless: everything else renders; at worst the
+  costmap overlay is blank. Goes away with 3D acceleration disabled.
 
 ## Next steps
 
