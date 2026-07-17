@@ -6,8 +6,11 @@ Replaces the Gazebo gpu_lidar sensor, which requires GPU rendering that is
 unavailable in this VM (VMware SVGA3D is too unstable for OGRE2). From Nav2's
 perspective the output is a normal sensor_msgs/LaserScan on /scan.
 
-The obstacle list must be kept in sync with the world SDF. Each obstacle is
-an axis-aligned box footprint: (x_min, x_max, y_min, y_max).
+Obstacles come from the `scenario_file` ROS parameter (a scenario.yaml
+written by gen_scenario.py, the single source of truth for generated
+scenarios). Without the parameter, falls back to the built-in list matching
+the hand-written drone_nav2_world.sdf. Each obstacle is an axis-aligned box
+footprint: (x_min, x_max, y_min, y_max).
 """
 
 import math
@@ -18,10 +21,24 @@ from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 
-# obstacle_1 in drone_nav2_world.sdf: 1x4x2 box centered at (4, 0, 1)
-OBSTACLES = [
+# Fallback: obstacle_1 in drone_nav2_world.sdf, a 1x4x2 box centered at (4, 0, 1)
+DEFAULT_OBSTACLES = [
     (3.5, 4.5, -2.0, 2.0),
 ]
+
+
+def load_obstacles(scenario_file, logger):
+    if not scenario_file:
+        logger.info("No scenario_file parameter; using built-in obstacle list "
+                    "(drone_nav2_world.sdf).")
+        return DEFAULT_OBSTACLES
+    import yaml
+    with open(scenario_file) as f:
+        scenario = yaml.safe_load(f)
+    obstacles = [(o["x_min"], o["x_max"], o["y_min"], o["y_max"])
+                 for o in scenario["obstacles"]]
+    logger.info(f"Loaded {len(obstacles)} obstacle(s) from {scenario_file}")
+    return obstacles
 
 N_RAYS = 360
 ANGLE_MIN = -math.pi
@@ -67,6 +84,10 @@ class VirtualLidar(Node):
     def __init__(self):
         super().__init__("virtual_lidar")
 
+        self.declare_parameter("scenario_file", "")
+        scenario_file = self.get_parameter("scenario_file").value
+        self.obstacles = load_obstacles(scenario_file, self.get_logger())
+
         self.scan_pub = self.create_publisher(LaserScan, "/scan", 10)
         self.odom_sub = self.create_subscription(
             Odometry, "/odom", self.odom_callback, 10
@@ -76,7 +97,7 @@ class VirtualLidar(Node):
         self.timer = self.create_timer(1.0 / PUBLISH_RATE_HZ, self.publish_scan)
 
         self.get_logger().info(
-            f"Virtual lidar started: {N_RAYS} rays, {len(OBSTACLES)} obstacle(s)."
+            f"Virtual lidar started: {N_RAYS} rays, {len(self.obstacles)} obstacle(s)."
         )
 
     def odom_callback(self, msg: Odometry):
@@ -106,7 +127,7 @@ class VirtualLidar(Node):
             dy = math.sin(angle)
 
             dist = min(
-                (ray_box_distance(x, y, dx, dy, box) for box in OBSTACLES),
+                (ray_box_distance(x, y, dx, dy, box) for box in self.obstacles),
                 default=math.inf,
             )
 

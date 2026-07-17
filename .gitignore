@@ -5,3 +5,6 @@ __pycache__/
 # Raw run logs are regenerated on every run (and get large — a single goal
 # log can be ~10 MB of feedback stream). Keep curated runs in results/ instead.
 nav2/logs/
+
+# Generated scenarios are fully reproducible from gen_scenario.py + seed.
+nav2/scenarios/

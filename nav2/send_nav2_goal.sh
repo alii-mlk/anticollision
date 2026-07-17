@@ -6,11 +6,28 @@ ROS_SETUP="/opt/ros/jazzy/setup.bash"
 source "$ROS_SETUP"
 set -u
 
-# obstacle_1 is a 1x4x2 box centered at (4, 0, 1) -- spans x:[3.5,4.5], y:[-2,2].
-# Drone starts at (0, 0, 1). This goal sits directly behind the obstacle, so
-# a straight-line plan would drive through it; Nav2 has to route around.
-GOAL_X="${1:-8.0}"
-GOAL_Y="${2:-0.0}"
+# Usage:
+#   ./send_nav2_goal.sh                      -> default goal (8, 0) for the classic world
+#   ./send_nav2_goal.sh X Y                  -> explicit goal
+#   ./send_nav2_goal.sh --scenario <dir>     -> goal from <dir>/scenario.yaml
+if [ "${1:-}" = "--scenario" ]; then
+  SCENARIO_YAML="$2/scenario.yaml"
+  read -r GOAL_X GOAL_Y <<< "$(python3 -c "
+import yaml
+g = yaml.safe_load(open('$SCENARIO_YAML'))['goal']
+print(g['x'], g['y'])
+")"
+else
+  GOAL_X="${1:-8.0}"
+  GOAL_Y="${2:-0.0}"
+fi
+
+# Arm the drone right before every goal: the enable retries in
+# start_drone_stack.sh can all land while Gazebo is still loading a heavy
+# world, leaving the motors disabled. Re-sending here is idempotent.
+echo "Enabling drone..."
+gz topic -t /drone_1/enable -m gz.msgs.Boolean -p "data: true"
+sleep 1
 
 echo "Sending NavigateToPose goal: x=$GOAL_X, y=$GOAL_Y"
 

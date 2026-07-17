@@ -5,6 +5,31 @@ set -u
 WORKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROS_SETUP="/opt/ros/jazzy/setup.bash"
 
+# Optional argument: a scenario directory produced by gen_scenario.py
+# (contains world.sdf + scenario.yaml). Without it, the classic hand-written
+# single-obstacle world is used.
+if [ -n "${1:-}" ]; then
+  SCENARIO_DIR="$(cd "$1" && pwd)"
+  WORLD_FILE="$SCENARIO_DIR/world.sdf"
+  SCENARIO_YAML="$SCENARIO_DIR/scenario.yaml"
+  if [ ! -f "$WORLD_FILE" ] || [ ! -f "$SCENARIO_YAML" ]; then
+    echo "ERROR: $SCENARIO_DIR must contain world.sdf and scenario.yaml" >&2
+    exit 1
+  fi
+  echo "Using scenario: $SCENARIO_DIR"
+else
+  WORLD_FILE="$WORKDIR/drone_nav2_world.sdf"
+  SCENARIO_YAML=""
+  echo "Using default world: $WORLD_FILE"
+fi
+
+# ROS rejects an empty parameter override (`-p scenario_file:=`), so only
+# pass the parameter when a scenario is in use.
+SCENARIO_PARAM=""
+if [ -n "$SCENARIO_YAML" ]; then
+  SCENARIO_PARAM="-p scenario_file:=$SCENARIO_YAML"
+fi
+
 LOGDIR="$WORKDIR/logs"
 mkdir -p "$LOGDIR"
 
@@ -24,9 +49,10 @@ echo "Stopping old drone/Nav2 bridge processes..."
 pkill -f "ros2 topic pub /cmd_vel" || true
 pkill -f "drone_pose_to_odom_tf.py" || true
 pkill -f "ros_gz_bridge.*parameter_bridge" || true
-pkill -f "gz sim.*drone_nav2_world.sdf" || true
-pkill -f "ruby.*gz sim.*drone_nav2_world.sdf" || true
+pkill -f "gz sim" || true
+pkill -f "ruby.*gz sim" || true
 pkill -f "virtual_lidar.py" || true
+pkill -f "hit_monitor.py" || true
 
 sleep 2
 
@@ -34,7 +60,7 @@ echo "Starting Gazebo + bridges..."
 
 open_term "1 Gazebo Drone World (server, no GUI)" "
   cd '$WORKDIR' &&
-  gz sim -s -r drone_nav2_world.sdf
+  gz sim -s -r '$WORLD_FILE'
 "
 
 sleep 6
@@ -68,12 +94,20 @@ sleep 2
 open_term "5 Virtual Lidar" "
   cd '$WORKDIR' &&
   source '$ROS_SETUP' &&
-  python3 virtual_lidar.py --ros-args -p use_sim_time:=true
+  python3 virtual_lidar.py --ros-args -p use_sim_time:=true $SCENARIO_PARAM
 "
 
 sleep 2
 
-open_term "6 Enable Drone" "
+open_term "6 Hit Monitor" "
+  cd '$WORKDIR' &&
+  source '$ROS_SETUP' &&
+  python3 hit_monitor.py --ros-args -p use_sim_time:=true $SCENARIO_PARAM
+"
+
+sleep 2
+
+open_term "7 Enable Drone" "
   for i in \$(seq 1 10); do
     sleep 2
     gz topic -t /drone_1/enable -m gz.msgs.Boolean -p 'data: true' &&

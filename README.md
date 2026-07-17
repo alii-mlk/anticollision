@@ -32,6 +32,10 @@ nav2/
   test_move_drone.sh          # sanity check: drives the drone via /cmd_vel directly, bypassing Nav2
   view.sh + drone_view.rviz   # RViz2 view: odometry trail, lidar hits, costmap, planned path
   view_gazebo.sh              # attaches the Gazebo GUI to the running headless server
+  gen_scenario.py             # random scenario generator: start/goal/N obstacles ->
+                              #   scenarios/<name>/{world.sdf, scenario.yaml} (single source)
+  hit_monitor.py              # counts obstacle hits (doesn't stop the run) + min clearance
+  scenarios/                  # generated scenarios (gitignored; reproducible from seed)
   logs/                       # all terminals and runs tee their output here (gitignored candidate)
   old/                        # superseded prototype (dead-reckoning bridge)
 ```
@@ -77,6 +81,55 @@ like path length and path/Euclidean ratio).
 ./stop_drone_stack.sh         # kills Gazebo + bridges; Ctrl+C the Nav2 terminal
 ```
 
+## Randomized scenarios
+
+Following the evaluation protocol (random start, random goal, N random fixed
+obstacles, count hits instead of stopping).
+
+**Generator parameters** (`./gen_scenario.py --help`):
+
+| Parameter | Meaning |
+|---|---|
+| `--n-obstacles N` | required; number of random boxes to place |
+| `--seed S` | required; same seed + same N = identical scenario (reproducible) |
+| `--out DIR` | optional; output directory (default `scenarios/s<seed>_n<N>/`) |
+
+Placement rules baked into the generator (constants at the top of
+`gen_scenario.py`): workspace `[-9, 9]²`, start↔goal at least 8 m apart, 1.8 m
+obstacle-free zone around start and goal, ≥ 0.4 m gap between obstacles,
+footprints 0.5–2 m × 0.5–4 m, heights 2–3 m (always intersecting the 1 m
+flight altitude). It writes the world SDF **and** `scenario.yaml` from one
+source, so the simulation, the virtual lidar, and the hit monitor always agree
+on where the obstacles are.
+
+**Full command order for a scenario run** (each numbered step in its own
+terminal, from `nav2/`):
+
+```bash
+./gen_scenario.py --n-obstacles 4 --seed 42        # 0. generate -> scenarios/s42_n4/
+
+./start_drone_stack.sh scenarios/s42_n4            # 1. sim + bridges + hit monitor;
+                                                   #    wait for "Publishing /odom" lines
+./launch_nav2.sh                                   # 2. wait for "Managed nodes are active"
+
+./view.sh                                          # 3. (optional) RViz: costmap/path/trail
+./view_gazebo.sh                                   # 3b. (optional) Gazebo 3D window
+
+./send_nav2_goal.sh --scenario scenarios/s42_n4    # 4. arms drone + sends scenario goal
+                                                   #    (or: ./send_nav2_goal.sh X Y)
+
+cat logs/hits_current.yaml                         # 5. hits / min clearance of the run
+./stop_drone_stack.sh                              # 6. teardown (Ctrl+C Nav2 terminal)
+```
+
+`hit_monitor.py` counts each contact episode between the drone (modeled as a
+0.3 m disc) and an obstacle — the run is not stopped, per the protocol. Live
+totals go to `logs/hits_current.yaml`; hits are logged in its terminal.
+
+Verified results: `s42_n4` (4 obstacles, 12 m lateral path) SUCCEEDED in 32 s,
+0 recoveries, 0 hits, min clearance 2.09 m; `s7_n10` (10 obstacles, 8 m path)
+SUCCEEDED in 18 s, 0 recoveries, 0 hits, min clearance 0.59 m.
+
 ## Visualization
 
 Two independent viewers; both attach to the running stack and can be opened or
@@ -118,10 +171,18 @@ Gazebo (gz sim -s, headless)
 Nav2 runs **mapless**: no static map, no AMCL. `map -> odom` is a static identity
 transform; both costmaps are filled purely from `/scan` (obstacle layer + inflation).
 DWB is configured holonomic (`min/max_vel_y` nonzero) so the planner can use the
-drone's ability to strafe. The final yaw tolerance is effectively disabled
-(`yaw_goal_tolerance: 6.28`, no RotateToGoal critic): a multicopter's heading is
-irrelevant, and requiring one made the drone rotate in place at the goal, which
-the progress checker treats as being stuck.
+drone's ability to strafe — and **fully heading-agnostic**, which took three
+separate deviations from Nav2 defaults, each discovered through a failing run:
+
+1. `yaw_goal_tolerance: 6.28`, no RotateToGoal critic — requiring a final
+   heading made the drone rotate in place at the goal, which the progress
+   checker treats as being stuck.
+2. No PathAlign/GoalAlign critics — heading-alignment scoring forces
+   rotate-before-translate behavior and stalled every lateral-dominant path.
+3. `max_vel_theta: 0.0` — empirically, any sustained yaw-rate command (e.g.
+   wz=-1.0) stalls the X3's MulticopterVelocityControl completely: correct
+   velocities arrive in Gazebo and the drone produces no thrust at all. Pure
+   translation works. The drone therefore keeps its spawn heading forever.
 
 ### Why a "virtual" lidar?
 

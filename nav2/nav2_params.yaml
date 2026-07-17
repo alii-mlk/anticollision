@@ -34,7 +34,11 @@ controller_server:
       min_vel_y: -0.4
       max_vel_x: 0.6
       max_vel_y: 0.4
-      max_vel_theta: 1.0
+      # Zero yaw rate: commanding the X3 to yaw (weak yaw authority) stalls
+      # its velocity controller entirely -- empirically, a cmd_vel with
+      # wz=-1.0 produces no motion at all while pure translation works.
+      # The drone is holonomic in x/y and never needs to rotate.
+      max_vel_theta: 0.0
       min_speed_xy: 0.0
       max_speed_xy: 0.7
       min_speed_theta: 0.0
@@ -46,7 +50,7 @@ controller_server:
       decel_lim_theta: -2.0
       vx_samples: 20
       vy_samples: 10
-      vtheta_samples: 20
+      vtheta_samples: 1
       sim_time: 1.5
       linear_granularity: 0.05
       angular_granularity: 0.025
@@ -55,12 +59,13 @@ controller_server:
       trans_stopped_velocity: 0.1
       short_circuit_trajectory_evaluation: True
       stateful: True
-      critics: ["Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      # No PathAlign/GoalAlign: they score the robot's HEADING against the
+      # path, which forces rotate-before-translate behavior. The multicopter
+      # has weak yaw authority and doesn't need to face its direction of
+      # travel, so heading critics stall it on lateral paths; PathDist and
+      # GoalDist alone steer position, letting it strafe freely.
+      critics: ["Oscillation", "BaseObstacle", "PathDist", "GoalDist"]
       BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
       PathDist.scale: 32.0
       GoalDist.scale: 24.0
 
