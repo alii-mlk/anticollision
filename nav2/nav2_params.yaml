@@ -172,6 +172,11 @@ bt_navigator:
     global_frame: map
     robot_base_frame: base_link
     odom_topic: /odom
+    # Generous IPC timeouts: on the loaded VM, action-server acknowledgments
+    # can lag; the 20 ms default caused spurious "Timed out waiting for action
+    # server" aborts in batch runs (the only failure mode observed).
+    default_server_timeout: 200
+    wait_for_service_timeout: 10000
 
 velocity_smoother:
   ros__parameters:

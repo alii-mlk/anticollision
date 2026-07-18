@@ -8,3 +8,6 @@ nav2/logs/
 
 # Generated scenarios are fully reproducible from gen_scenario.py + seed.
 nav2/scenarios/
+
+# Batch evaluation output (large; promote citable batches to results/).
+nav2/runs/

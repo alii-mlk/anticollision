@@ -14,8 +14,9 @@ Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates aroun
 ## Repository layout
 
 ```
-collision.sdf                 # earlier experiment: drones colliding
-3 drones move manually.sdf    # earlier experiment: manual multi-drone control
+Thesis Progress.docx          # running progress report
+results/                      # curated, citable run evidence (one folder per experiment)
+early_versions/               # superseded experiments, kept for project history
 nav2/
   drone_nav2_world.sdf        # world: ground plane, obstacle_1 (1x4x2 wall at x=4), X3 drone
                               #   with multicopter motor/velocity-control + OdometryPublisher plugins
@@ -35,9 +36,11 @@ nav2/
   gen_scenario.py             # random scenario generator: start/goal/N obstacles ->
                               #   scenarios/<name>/{world.sdf, scenario.yaml} (single source)
   hit_monitor.py              # counts obstacle hits (doesn't stop the run) + min clearance
+  run_batch.sh                # unattended sweep: N obstacles x seeds -> runs/batch_<ts>/
+  compute_metrics.py          # batch dir -> metrics.csv + per-N summary (+ plots)
   scenarios/                  # generated scenarios (gitignored; reproducible from seed)
-  logs/                       # all terminals and runs tee their output here (gitignored candidate)
-  old/                        # superseded prototype (dead-reckoning bridge)
+  runs/                       # batch outputs (gitignored; promote keepers to results/)
+  logs/                       # all terminals and runs tee their output here (gitignored)
 ```
 
 ## Running (step by step)
@@ -129,6 +132,34 @@ totals go to `logs/hits_current.yaml`; hits are logged in its terminal.
 Verified results: `s42_n4` (4 obstacles, 12 m lateral path) SUCCEEDED in 32 s,
 0 recoveries, 0 hits, min clearance 2.09 m; `s7_n10` (10 obstacles, 8 m path)
 SUCCEEDED in 18 s, 0 recoveries, 0 hits, min clearance 0.59 m.
+
+## Batch evaluation
+
+Unattended sweep over obstacle counts and seeds, per the evaluation protocol
+(success rate, time, path/Euclidean ratio, and hit count as functions of N):
+
+```bash
+./run_batch.sh                                   # default: N in {1,2,4,6,8,10} x 5 seeds
+N_LIST="1 4 8" SEEDS="1 2 3" ./run_batch.sh      # custom sweep
+GOAL_TIMEOUT=300 ./run_batch.sh                  # longer per-goal watchdog (default 240 s)
+```
+
+The batch runner starts everything headless (no terminal windows): per (N, seed)
+it generates the scenario, brings up Gazebo + bridges + lidar + hit monitor +
+Nav2, waits for readiness, arms the drone, sends the scenario goal with a
+timeout, records all artifacts under `runs/batch_<timestamp>/n<N>_s<seed>/`
+(feedback stream, hits, every component's log, final status), tears everything
+down, and continues — failures are recorded (`STACK_FAIL` / `NAV2_FAIL` /
+`TIMEOUT`) without stopping the batch. Expect roughly 1.5–2.5 min per run on
+the VM; a full default sweep (30 runs) is about an hour.
+
+```bash
+python3 compute_metrics.py runs/batch_<timestamp>
+```
+
+writes `metrics.csv` (one row per run), `summary.txt` (per-N aggregate table),
+and `plots/*.png` (if matplotlib is installed: `sudo apt install
+python3-matplotlib`).
 
 ## Visualization
 
