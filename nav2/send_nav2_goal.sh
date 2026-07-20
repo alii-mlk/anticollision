@@ -29,6 +29,9 @@ echo "Enabling drone..."
 gz topic -t /drone_1/enable -m gz.msgs.Boolean -p "data: true"
 sleep 1
 
+# Zero the hit counter so hits are measured from navigation start.
+ros2 topic pub --once /hit_monitor/reset std_msgs/msg/Empty > /dev/null
+
 echo "Sending NavigateToPose goal: x=$GOAL_X, y=$GOAL_Y"
 
 LOGDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/logs"
@@ -42,3 +45,11 @@ pose:
     position: {x: $GOAL_X, y: $GOAL_Y, z: 0.0}
     orientation: {w: 1.0}
 " --feedback 2>&1 | tee "$LOGDIR/goal_$(date +%H%M%S).txt"
+
+# Snapshot the hit state at goal end (hits_current.yaml keeps updating while
+# the drone sits at the goal and obstacles drift around).
+if [ -f "$LOGDIR/hits_current.yaml" ]; then
+  echo ""
+  echo "Navigation hit summary:"
+  tee "$LOGDIR/hits_goal_$(date +%H%M%S).yaml" < "$LOGDIR/hits_current.yaml"
+fi

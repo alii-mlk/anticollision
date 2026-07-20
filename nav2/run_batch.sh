@@ -28,11 +28,12 @@ set -u
 
 N_LIST="${N_LIST:-1 2 4 6 8 10}"
 SEEDS="${SEEDS:-1 2 3 4 5}"
+OBSTACLE_SPEED="${OBSTACLE_SPEED:-0}"   # m/s; > 0 = moving obstacles (Phase C)
 GOAL_TIMEOUT="${GOAL_TIMEOUT:-240}"     # wall seconds per goal attempt
 BATCH_DIR="$WORKDIR/runs/batch_$(date +%Y%m%d_%H%M%S)"
 
 mkdir -p "$BATCH_DIR"
-echo "Batch: N in [$N_LIST], seeds in [$SEEDS], goal timeout ${GOAL_TIMEOUT}s"
+echo "Batch: N in [$N_LIST], seeds in [$SEEDS], obstacle speed ${OBSTACLE_SPEED} m/s, goal timeout ${GOAL_TIMEOUT}s"
 echo "Output: $BATCH_DIR"
 
 kill_stack() {
@@ -42,6 +43,7 @@ kill_stack() {
   pkill -f "drone_pose_to_odom_tf.py" 2>/dev/null || true
   pkill -f "virtual_lidar.py" 2>/dev/null || true
   pkill -f "hit_monitor.py" 2>/dev/null || true
+  pkill -f "obstacle_mover.py" 2>/dev/null || true
   pkill -f "nav2_minimal.launch.py" 2>/dev/null || true
   pkill -f "controller_server" 2>/dev/null || true
   pkill -f "planner_server" 2>/dev/null || true
@@ -73,6 +75,7 @@ run_one() {
 
   echo "=== run n=$n seed=$seed -> $run_dir"
   python3 "$WORKDIR/gen_scenario.py" --n-obstacles "$n" --seed "$seed" \
+    --obstacle-speed "$OBSTACLE_SPEED" \
     --out "$scen_dir" > "$run_dir/gen.log" 2>&1 || {
       echo "STACK_FAIL" > "$run_dir/status.txt"
       echo "    generation failed"; return; }
@@ -107,6 +110,10 @@ run_one() {
     -p "state_file:=$run_dir/hits.yaml" \
     > "$run_dir/monitor.log" 2>&1 &
 
+  python3 "$WORKDIR/obstacle_mover.py" --ros-args \
+    -p use_sim_time:=true -p "scenario_file:=$scen_dir/scenario.yaml" \
+    > "$run_dir/mover.log" 2>&1 &
+
   # readiness: odometry flowing means gz + bridge + tf node are alive
   if ! timeout 40 ros2 topic echo /odom --once > /dev/null 2>&1; then
     echo "STACK_FAIL" > "$run_dir/status.txt"
@@ -128,6 +135,13 @@ run_one() {
     sleep 1
   done
 
+  # Count hits from navigation start, not from stack start (moving obstacles
+  # can drift over the parked drone while Nav2 is still coming up).
+  ros2 topic pub --once /hit_monitor/reset std_msgs/msg/Empty >/dev/null 2>&1
+
+  # Snapshot the hit state right when the goal ends, so teardown-time drift
+  # doesn't add post-navigation hits (write_state runs at 2 Hz).
+
   read -r GX GY <<< "$(python3 -c "
 import yaml
 g = yaml.safe_load(open('$scen_dir/scenario.yaml'))['goal']
@@ -143,6 +157,8 @@ pose:
     position: {x: $GX, y: $GY, z: 0.0}
     orientation: {w: 1.0}
 " --feedback > "$run_dir/goal.txt" 2>&1
+
+  cp "$run_dir/hits.yaml" "$run_dir/hits_final.yaml" 2>/dev/null || true
 
   local status
   status="$(grep -oE 'Goal finished with status: [A-Z]+' "$run_dir/goal.txt" \

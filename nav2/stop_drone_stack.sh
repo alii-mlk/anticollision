@@ -9,7 +9,7 @@ pkill -f "gz sim" || true
 pkill -f "ruby.*gz sim" || true
 pkill -f "virtual_lidar.py" || true
 pkill -f "hit_monitor.py" || true
+pkill -f "obstacle_mover.py" || true
 pkill -f "nav2_minimal.launch.py" || true
 
-echo "Stopped bridge/Gazebo processes."
-echo "If any empty terminal windows remain, you can close them manually."
+echo "All simulation, bridge, and Nav2 processes stopped."

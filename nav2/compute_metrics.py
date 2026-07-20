@@ -36,9 +36,11 @@ def parse_scenario(path):
         return (float(m.group(1)), float(m.group(2))) if m else None
     n = re.search(r"n_obstacles:\s*(\d+)", text)
     seed = re.search(r"seed:\s*(\d+)", text)
+    speed = re.search(r"obstacle_speed:\s*([\d.]+)", text)
     return {
         "seed": int(seed.group(1)) if seed else None,
         "n_obstacles": int(n.group(1)) if n else None,
+        "obstacle_speed": float(speed.group(1)) if speed else 0.0,
         "start": grab("start"),
         "goal": grab("goal"),
     }
@@ -87,7 +89,12 @@ def collect(batch_dir):
         status_file = run_dir / "status.txt"
         status = status_file.read_text().strip() if status_file.exists() else "MISSING"
         pts, nav_time = parse_goal_feedback(run_dir / "goal.txt")
-        hits, min_clear = parse_hits(run_dir / "hits.yaml")
+        # hits_final.yaml is snapshotted at goal end; hits.yaml keeps being
+        # rewritten during teardown and may include post-navigation drift.
+        hits_file = run_dir / "hits_final.yaml"
+        if not hits_file.exists():
+            hits_file = run_dir / "hits.yaml"
+        hits, min_clear = parse_hits(hits_file)
 
         euclid = (math.dist(scen["start"], scen["goal"])
                   if scen["start"] and scen["goal"] else None)
@@ -97,6 +104,7 @@ def collect(batch_dir):
         rows.append({
             "run": run_dir.name,
             "n_obstacles": scen["n_obstacles"],
+            "obstacle_speed": scen["obstacle_speed"],
             "seed": scen["seed"],
             "status": status,
             "nav_time_s": round(nav_time, 1) if nav_time else None,
@@ -110,17 +118,17 @@ def collect(batch_dir):
 
 
 def summarize(rows):
-    by_n = {}
+    by_key = {}
     for r in rows:
-        by_n.setdefault(r["n_obstacles"], []).append(r)
+        by_key.setdefault((r["n_obstacles"], r["obstacle_speed"]), []).append(r)
 
     lines = []
-    header = (f"{'N':>3} {'runs':>5} {'success':>8} {'mean_t(s)':>10} "
+    header = (f"{'N':>3} {'v(m/s)':>7} {'runs':>5} {'success':>8} {'mean_t(s)':>10} "
               f"{'mean_ratio':>11} {'hits':>5} {'min_clear(m)':>13}")
     lines.append(header)
     lines.append("-" * len(header))
-    for n in sorted(k for k in by_n if k is not None):
-        rs = by_n[n]
+    for n, v in sorted(k for k in by_key if k[0] is not None):
+        rs = by_key[(n, v)]
         ok = [r for r in rs if r["status"] == "SUCCEEDED"]
         rate = f"{len(ok)}/{len(rs)}"
         mean = lambda vals: (sum(vals) / len(vals)) if vals else None
@@ -129,7 +137,7 @@ def summarize(rows):
         hits = sum(r["hits"] or 0 for r in rs)
         clears = [r["min_clearance_m"] for r in rs if r["min_clearance_m"] is not None]
         worst = min(clears) if clears else None
-        lines.append(f"{n:>3} {len(rs):>5} {rate:>8} "
+        lines.append(f"{n:>3} {v:>7.2f} {len(rs):>5} {rate:>8} "
                      f"{(f'{mt:.1f}' if mt is not None else '-'):>10} "
                      f"{(f'{mr:.3f}' if mr is not None else '-'):>11} "
                      f"{hits:>5} "
@@ -146,35 +154,44 @@ def try_plots(rows, out_dir):
         print("(matplotlib not available -- skipping plots)")
         return
 
-    by_n = {}
+    # X axis: obstacle speed when the batch sweeps speeds (Phase C),
+    # otherwise number of obstacles (Phase B).
+    speeds = {r["obstacle_speed"] for r in rows}
+    ns_set = {r["n_obstacles"] for r in rows if r["n_obstacles"] is not None}
+    if len(speeds) > 1 and len(ns_set) <= 1:
+        key, xlabel = "obstacle_speed", "Obstacle speed (m/s)"
+    else:
+        key, xlabel = "n_obstacles", "Number of obstacles"
+
+    by_x = {}
     for r in rows:
-        if r["n_obstacles"] is not None:
-            by_n.setdefault(r["n_obstacles"], []).append(r)
-    ns = sorted(by_n)
-    if not ns:
+        if r[key] is not None:
+            by_x.setdefault(r[key], []).append(r)
+    xs = sorted(by_x)
+    if not xs:
         return
 
     out_dir.mkdir(exist_ok=True)
 
-    def per_n(fn):
-        return [fn(by_n[n]) for n in ns]
+    def per_x(fn):
+        return [fn(by_x[x]) for x in xs]
 
     plots = [
         ("success_rate", "Success rate",
-         per_n(lambda rs: sum(r["status"] == "SUCCEEDED" for r in rs) / len(rs))),
+         per_x(lambda rs: sum(r["status"] == "SUCCEEDED" for r in rs) / len(rs))),
         ("mean_nav_time", "Mean navigation time (s, successes)",
-         per_n(lambda rs: _mean([r["nav_time_s"] for r in rs
+         per_x(lambda rs: _mean([r["nav_time_s"] for r in rs
                                  if r["status"] == "SUCCEEDED" and r["nav_time_s"]]))),
         ("mean_ratio", "Mean path/Euclidean ratio (successes)",
-         per_n(lambda rs: _mean([r["ratio"] for r in rs
+         per_x(lambda rs: _mean([r["ratio"] for r in rs
                                  if r["status"] == "SUCCEEDED" and r["ratio"]]))),
         ("total_hits", "Total hits",
-         per_n(lambda rs: sum(r["hits"] or 0 for r in rs))),
+         per_x(lambda rs: sum(r["hits"] or 0 for r in rs))),
     ]
     for name, title, values in plots:
         fig, ax = plt.subplots(figsize=(6, 4))
-        ax.plot(ns, values, marker="o")
-        ax.set_xlabel("Number of obstacles")
+        ax.plot(xs, values, marker="o")
+        ax.set_xlabel(xlabel)
         ax.set_title(title)
         ax.grid(True, alpha=0.3)
         if name == "success_rate":

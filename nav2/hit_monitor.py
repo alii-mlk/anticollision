@@ -27,6 +27,8 @@ import rclpy
 from rclpy.node import Node
 
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Empty
+from visualization_msgs.msg import MarkerArray
 
 DEFAULT_OBSTACLES = [
     (3.5, 4.5, -2.0, 2.0),
@@ -68,17 +70,44 @@ class HitMonitor(Node):
         self.in_contact = False
         self.min_clearance = math.inf
         self.samples = 0
+        self.adopting = False
 
         self.odom_sub = self.create_subscription(
             Odometry, "/odom", self.odom_callback, 10)
+        # Live ground truth from obstacle_mover.py (moving obstacles).
+        self.obstacles_sub = self.create_subscription(
+            MarkerArray, "/obstacles", self.obstacles_callback, 10)
+        # Reset (from the goal scripts, right before each goal) so hits are
+        # counted from navigation start -- a moving obstacle drifting over the
+        # PARKED drone before the goal is not a navigation failure.
+        self.reset_sub = self.create_subscription(
+            Empty, "/hit_monitor/reset", self.reset_callback, 10)
 
         # Rewrite the state file at 2 Hz rather than every odom message.
         self.timer = self.create_timer(0.5, self.write_state)
 
         self.get_logger().info(
-            f"Hit monitor started: {len(self.obstacles)} obstacle(s), "
-            f"drone radius {self.radius} m. Counting hits, not stopping."
+            f"Hit monitor active: {len(self.obstacles)} obstacle(s), "
+            f"drone radius {self.radius:.2f} m."
         )
+
+    def reset_callback(self, _msg: Empty):
+        self.hits = 0
+        self.min_clearance = math.inf
+        self.samples = 0
+        # Adopt (don't count) a contact that already exists at reset time: an
+        # obstacle sitting on the still-parked drone is an initial condition,
+        # not a navigation failure. Ignored until that contact first releases.
+        self.adopting = True
+        self.get_logger().info("Hit counters reset for the new navigation goal.")
+        self.write_state()
+
+    def obstacles_callback(self, msg: MarkerArray):
+        self.obstacles = [
+            (m.pose.position.x - m.scale.x / 2, m.pose.position.x + m.scale.x / 2,
+             m.pose.position.y - m.scale.y / 2, m.pose.position.y + m.scale.y / 2)
+            for m in msg.markers
+        ]
 
     def odom_callback(self, msg: Odometry):
         p = msg.pose.pose.position
@@ -86,14 +115,25 @@ class HitMonitor(Node):
             (distance_to_rect(p.x, p.y, r) for r in self.obstacles),
             default=math.inf,
         ) - self.radius
+        contact = clearance <= 0.0
+
+        if self.adopting:
+            # Inherited pre-navigation contact: don't count it, don't let it
+            # poison min_clearance. Adoption ends when the contact releases
+            # (or immediately if there is none).
+            if contact:
+                self.in_contact = True
+                return
+            self.adopting = False
+            self.in_contact = False
+
         self.samples += 1
         self.min_clearance = min(self.min_clearance, clearance)
 
-        contact = clearance <= 0.0
         if contact and not self.in_contact:
             self.hits += 1
             self.get_logger().warn(
-                f"HIT #{self.hits} at x={p.x:.2f}, y={p.y:.2f}"
+                f"Hit #{self.hits} at x={p.x:.2f}, y={p.y:.2f}"
             )
         self.in_contact = contact
 

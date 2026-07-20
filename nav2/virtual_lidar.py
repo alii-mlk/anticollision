@@ -20,6 +20,7 @@ from rclpy.node import Node
 
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
+from visualization_msgs.msg import MarkerArray
 
 # Fallback: obstacle_1 in drone_nav2_world.sdf, a 1x4x2 box centered at (4, 0, 1)
 DEFAULT_OBSTACLES = [
@@ -29,7 +30,7 @@ DEFAULT_OBSTACLES = [
 
 def load_obstacles(scenario_file, logger):
     if not scenario_file:
-        logger.info("No scenario_file parameter; using built-in obstacle list "
+        logger.info("No scenario file given; using the default obstacle layout "
                     "(drone_nav2_world.sdf).")
         return DEFAULT_OBSTACLES
     import yaml
@@ -92,6 +93,11 @@ class VirtualLidar(Node):
         self.odom_sub = self.create_subscription(
             Odometry, "/odom", self.odom_callback, 10
         )
+        # Live ground truth from obstacle_mover.py overrides the initial list
+        # (identical for static scenarios; moving for --obstacle-speed > 0).
+        self.obstacles_sub = self.create_subscription(
+            MarkerArray, "/obstacles", self.obstacles_callback, 10
+        )
 
         self.pose = None
         self.timer = self.create_timer(1.0 / PUBLISH_RATE_HZ, self.publish_scan)
@@ -99,6 +105,13 @@ class VirtualLidar(Node):
         self.get_logger().info(
             f"Virtual lidar started: {N_RAYS} rays, {len(self.obstacles)} obstacle(s)."
         )
+
+    def obstacles_callback(self, msg: MarkerArray):
+        self.obstacles = [
+            (m.pose.position.x - m.scale.x / 2, m.pose.position.x + m.scale.x / 2,
+             m.pose.position.y - m.scale.y / 2, m.pose.position.y + m.scale.y / 2)
+            for m in msg.markers
+        ]
 
     def odom_callback(self, msg: Odometry):
         p = msg.pose.pose.position

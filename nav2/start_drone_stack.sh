@@ -53,6 +53,7 @@ pkill -f "gz sim" || true
 pkill -f "ruby.*gz sim" || true
 pkill -f "virtual_lidar.py" || true
 pkill -f "hit_monitor.py" || true
+pkill -f "obstacle_mover.py" || true
 
 sleep 2
 
@@ -107,13 +108,21 @@ open_term "6 Hit Monitor" "
 
 sleep 2
 
-open_term "7 Enable Drone" "
+open_term "7 Obstacle Mover" "
+  cd '$WORKDIR' &&
+  source '$ROS_SETUP' &&
+  python3 obstacle_mover.py --ros-args -p use_sim_time:=true $SCENARIO_PARAM
+"
+
+sleep 2
+
+open_term "8 Enable Drone" "
   for i in \$(seq 1 10); do
     sleep 2
     gz topic -t /drone_1/enable -m gz.msgs.Boolean -p 'data: true' &&
-    echo \"Enable command \$i/10 sent.\"
+    echo \"Arming command \$i/10 sent.\"
   done
-  echo 'Drone enable retries finished.'
+  echo 'Drone arming sequence finished.'
 "
 
 echo "All bridge terminals started."

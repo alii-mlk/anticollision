@@ -65,6 +65,15 @@ Visualization Manager:
       Color Scheme: costmap
       Draw Behind: true
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Obstacles
+      Enabled: true
+      Topic:
+        Value: /obstacles
+        Depth: 5
+        Durability Policy: Volatile
+        Reliability Policy: Reliable
+      Value: true
     - Class: rviz_default_plugins/Path
       Name: GlobalPlan
       Enabled: true

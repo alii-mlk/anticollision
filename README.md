@@ -2,7 +2,17 @@
 
 Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates around obstacles using the ROS 2 Nav2 stack.
 
-**Status:** single static obstacle avoidance works end-to-end. The drone flies from (0,0) to a goal behind a wall and back, planning around the obstacle. Verified over repeated runs: ~18–19 s per 8 m leg, 0 recovery behaviors, path-length-to-Euclidean-distance ratio ≈ 1.3.
+**Status:** the full baseline evaluation of plain Nav2 is complete.
+
+- *Static obstacles* — 48/48 randomized runs collision-free across 1–10
+  obstacles; navigation time and detour overhead grow mildly with obstacle
+  count (`results/2026-07-17_static_sweep/`).
+- *Moving obstacles* — collision avoidance degrades sharply with obstacle
+  speed: total hits rise from 1 to 73 (8 runs per speed) between 0.2 and
+  2.0 m/s, navigation time doubles, and beyond ~0.8 m/s obstacles outrun the
+  drone entirely (`results/2026-07-20_speed_sweep/`). This quantifies where
+  prediction-free Nav2 stops being sufficient and motivates the avoidance
+  component to be built on top of it.
 
 ## Requirements
 
@@ -36,6 +46,8 @@ nav2/
   gen_scenario.py             # random scenario generator: start/goal/N obstacles ->
                               #   scenarios/<name>/{world.sdf, scenario.yaml} (single source)
   hit_monitor.py              # counts obstacle hits (doesn't stop the run) + min clearance
+  obstacle_mover.py           # obstacle ground truth: integrates motion (bouncing), publishes
+                              #   /obstacles markers consumed by lidar + monitor + RViz
   run_batch.sh                # unattended sweep: N obstacles x seeds -> runs/batch_<ts>/
   compute_metrics.py          # batch dir -> metrics.csv + per-N summary (+ plots)
   scenarios/                  # generated scenarios (gitignored; reproducible from seed)
@@ -161,6 +173,39 @@ writes `metrics.csv` (one row per run), `summary.txt` (per-N aggregate table),
 and `plots/*.png` (if matplotlib is installed: `sudo apt install
 python3-matplotlib`).
 
+## Moving obstacles (Phase C)
+
+`gen_scenario.py --obstacle-speed V` gives every obstacle a random direction at
+V m/s; obstacles bounce elastically off the workspace bounds. Motion is
+integrated by `obstacle_mover.py` (launched by the stack and the batch runner),
+which publishes the live footprints on `/obstacles` — the virtual lidar and the
+hit monitor track that stream, so the drone senses the obstacles where they
+*currently* are. Moving obstacles are not modeled in the Gazebo world (a
+physical box frozen at its spawn pose would collide with the drone at a
+position the obstacle has virtually left); RViz shows them via the marker
+display.
+
+Speed sweep for the degradation experiment (fixed N, rising speed):
+
+```bash
+for v in 0.2 0.4 0.8 1.2 1.6 2.0; do
+  N_LIST="6" SEEDS="1 2 3 4 5 6 7 8" OBSTACLE_SPEED="$v" ./run_batch.sh
+done
+```
+
+Each speed gets its own batch dir; `compute_metrics.py` reports and plots per
+(N, speed) — merge batches by copying run dirs together before computing, or
+compute per batch. Hits are counted from goal start to goal resolution (the
+goal scripts reset the counter via `/hit_monitor/reset`, and a contact already
+present at navigation start is not counted).
+
+Measured result (N = 6, 8 seeds per speed, `results/2026-07-20_speed_sweep/`):
+goal completion never fails — runs are not stopped on contact — but hits rise
+1 → 73 across 0.2 → 2.0 m/s (~9 per flight at the top speed), navigation time
+grows 32 → 71 s, and the path ratio approaches 2×. The drone's own top speed
+is ~0.6–0.7 m/s, so beyond ~0.8 m/s obstacles outrun it and Nav2's
+prediction-free replanning cannot compensate.
+
 ## Visualization
 
 Two independent viewers; both attach to the running stack and can be opened or
@@ -246,9 +291,8 @@ swapped back in.
 
 ## Next steps
 
-1. Randomized obstacle scenarios: generate world SDF + `OBSTACLES` list from a single
-   source, batch-run goals, aggregate metrics from `logs/`.
-2. Metrics script (success rate, navigation time, path/Euclidean ratio, min obstacle
-   clearance) parsing `logs/goal_*.txt`.
-3. Moving obstacles: feed `virtual_lidar.py` live obstacle poses from Gazebo instead
-   of a static list.
+With the Nav2 baseline established (static sweep + speed-degradation sweep, see
+`results/`), the next phase is the thesis contribution itself: a predictive
+avoidance component on top of Nav2 that uses obstacle velocity — which plain
+Nav2 ignores — to close the gap the speed sweep exposes. The same batch runner
+and metrics then produce the with/without comparison.
