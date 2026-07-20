@@ -3,8 +3,8 @@
 
 Loads the obstacle set from the `scenario_file` parameter (scenario.yaml from
 gen_scenario.py; falls back to the built-in static wall of the classic world),
-integrates each obstacle's motion on sim time — straight line at its scenario
-velocity, bouncing elastically off the workspace bounds — and publishes the
+integrates each obstacle's motion on sim time (straight line at its scenario
+velocity, bouncing elastically off the workspace bounds) and publishes the
 current footprints as a visualization_msgs/MarkerArray on /obstacles at 20 Hz.
 
 That topic is the single source of obstacle truth while the stack runs:

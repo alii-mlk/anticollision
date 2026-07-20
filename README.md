@@ -4,11 +4,11 @@ Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates aroun
 
 **Status:** the full baseline evaluation of plain Nav2 is complete.
 
-- *Static obstacles* — 48/48 randomized runs collision-free across 1–10
+- *Static obstacles*: 48/48 randomized runs collision-free across 1–10
   obstacles; navigation time and detour overhead grow mildly with obstacle
   count (`results/2026-07-17_static_sweep/`).
-- *Moving obstacles* — collision avoidance degrades sharply with obstacle
-  speed: total hits rise from 1 to 73 (8 runs per speed) between 0.2 and
+- *Moving obstacles*: collision avoidance degrades sharply with obstacle
+  speed. Total hits rise from 1 to 73 (8 runs per speed) between 0.2 and
   2.0 m/s, navigation time doubles, and beyond ~0.8 m/s obstacles outrun the
   drone entirely (`results/2026-07-20_speed_sweep/`). This quantifies where
   prediction-free Nav2 stops being sufficient and motivates the avoidance
@@ -65,10 +65,11 @@ All commands from the `nav2/` directory.
 ./start_drone_stack.sh
 ```
 
-Opens 6 terminals: the Gazebo server (headless), the odometry/clock and cmd_vel
-bridges, the odom/TF republisher, the virtual lidar, and an arming loop that
-enables the drone's motors (retries for ~20 s). Wait until the "3 Drone Odom TF
-Bridge" terminal starts printing `Publishing /odom: ...` lines.
+Opens 8 terminals: the Gazebo server (headless), the odometry/clock and cmd_vel
+bridges, the odom/TF republisher, the virtual lidar, the hit monitor, the
+obstacle mover, and an arming loop that enables the drone's motors (retries for
+~20 s). Wait until the "3 Drone Odom TF Bridge" terminal starts printing
+`Publishing /odom: ...` lines.
 
 **2. Start Nav2 (new terminal):**
 
@@ -76,7 +77,7 @@ Bridge" terminal starts printing `Publishing /odom: ...` lines.
 ./launch_nav2.sh
 ```
 
-Wait for `Managed nodes are active` — Nav2 is ready. Leave this running.
+Wait for `Managed nodes are active`, which means Nav2 is ready. Leave this running.
 
 **3. Send a navigation goal (new terminal):**
 
@@ -87,8 +88,8 @@ Wait for `Managed nodes are active` — Nav2 is ready. Leave this running.
 
 The terminal streams feedback (distance remaining, recoveries) and ends with
 `Goal finished with status: SUCCEEDED`. Every run is also logged to
-`logs/goal_<time>.txt` (full feedback stream — the source for trajectory metrics
-like path length and path/Euclidean ratio).
+`logs/goal_<time>.txt` (the full feedback stream, which is the source for
+trajectory metrics like path length and path/Euclidean ratio).
 
 **4. Teardown:**
 
@@ -107,7 +108,8 @@ obstacles, count hits instead of stopping).
 |---|---|
 | `--n-obstacles N` | required; number of random boxes to place |
 | `--seed S` | required; same seed + same N = identical scenario (reproducible) |
-| `--out DIR` | optional; output directory (default `scenarios/s<seed>_n<N>/`) |
+| `--obstacle-speed V` | optional; m/s, random direction per obstacle (default 0 = static) |
+| `--out DIR` | optional; output directory (default `scenarios/s<seed>_n<N>[_v<speed>]/`) |
 
 Placement rules baked into the generator (constants at the top of
 `gen_scenario.py`): workspace `[-9, 9]²`, start↔goal at least 8 m apart, 1.8 m
@@ -138,7 +140,7 @@ cat logs/hits_current.yaml                         # 5. hits / min clearance of 
 ```
 
 `hit_monitor.py` counts each contact episode between the drone (modeled as a
-0.3 m disc) and an obstacle — the run is not stopped, per the protocol. Live
+0.3 m disc) and an obstacle; the run is not stopped, per the protocol. Live
 totals go to `logs/hits_current.yaml`; hits are logged in its terminal.
 
 Verified results: `s42_n4` (4 obstacles, 12 m lateral path) SUCCEEDED in 32 s,
@@ -156,12 +158,12 @@ N_LIST="1 4 8" SEEDS="1 2 3" ./run_batch.sh      # custom sweep
 GOAL_TIMEOUT=300 ./run_batch.sh                  # longer per-goal watchdog (default 240 s)
 ```
 
-The batch runner starts everything headless (no terminal windows): per (N, seed)
+The batch runner starts everything headless (no terminal windows). Per (N, seed)
 it generates the scenario, brings up Gazebo + bridges + lidar + hit monitor +
 Nav2, waits for readiness, arms the drone, sends the scenario goal with a
 timeout, records all artifacts under `runs/batch_<timestamp>/n<N>_s<seed>/`
 (feedback stream, hits, every component's log, final status), tears everything
-down, and continues — failures are recorded (`STACK_FAIL` / `NAV2_FAIL` /
+down, and continues. Failures are recorded (`STACK_FAIL` / `NAV2_FAIL` /
 `TIMEOUT`) without stopping the batch. Expect roughly 1.5–2.5 min per run on
 the VM; a full default sweep (30 runs) is about an hour.
 
@@ -178,7 +180,7 @@ python3-matplotlib`).
 `gen_scenario.py --obstacle-speed V` gives every obstacle a random direction at
 V m/s; obstacles bounce elastically off the workspace bounds. Motion is
 integrated by `obstacle_mover.py` (launched by the stack and the batch runner),
-which publishes the live footprints on `/obstacles` — the virtual lidar and the
+which publishes the live footprints on `/obstacles`. The virtual lidar and the
 hit monitor track that stream, so the drone senses the obstacles where they
 *currently* are. Moving obstacles are not modeled in the Gazebo world (a
 physical box frozen at its spawn pose would collide with the drone at a
@@ -194,16 +196,16 @@ done
 ```
 
 Each speed gets its own batch dir; `compute_metrics.py` reports and plots per
-(N, speed) — merge batches by copying run dirs together before computing, or
+(N, speed). Merge batches by copying run dirs together before computing, or
 compute per batch. Hits are counted from goal start to goal resolution (the
 goal scripts reset the counter via `/hit_monitor/reset`, and a contact already
 present at navigation start is not counted).
 
 Measured result (N = 6, 8 seeds per speed, `results/2026-07-20_speed_sweep/`):
-goal completion never fails — runs are not stopped on contact — but hits rise
-1 → 73 across 0.2 → 2.0 m/s (~9 per flight at the top speed), navigation time
-grows 32 → 71 s, and the path ratio approaches 2×. The drone's own top speed
-is ~0.6–0.7 m/s, so beyond ~0.8 m/s obstacles outrun it and Nav2's
+goal completion never fails, because runs are not stopped on contact, but hits
+rise 1 → 73 across 0.2 → 2.0 m/s (~9 per flight at the top speed), navigation
+time grows 32 → 71 s, and the path ratio approaches 2×. The drone's own top
+speed is ~0.6–0.7 m/s, so beyond ~0.8 m/s obstacles outrun it and Nav2's
 prediction-free replanning cannot compensate.
 
 ## Visualization
@@ -211,16 +213,17 @@ prediction-free replanning cannot compensate.
 Two independent viewers; both attach to the running stack and can be opened or
 closed at any time without affecting the simulation.
 
-**RViz (recommended — shows what Nav2 "thinks"):**
+**RViz (recommended; shows what Nav2 "thinks"):**
 
 ```bash
 ./view.sh
 ```
 
 Preconfigured view (`drone_view.rviz`): odometry arrow trail (the flown path),
-red lidar points tracing the wall, the global costmap with its inflation band,
-and the green planned path. The toolbar's *2D Goal Pose* tool sends goals by
-clicking in the view (bypasses the logging of `send_nav2_goal.sh`).
+red lidar points tracing the obstacles, the obstacle markers, the global
+costmap with its inflation band, and the green planned path. The toolbar's
+*2D Goal Pose* tool sends goals by clicking in the view (bypasses the logging
+of `send_nav2_goal.sh`).
 
 **Gazebo GUI (shows the simulated world itself):**
 
@@ -228,7 +231,7 @@ clicking in the view (bypasses the logging of `send_nav2_goal.sh`).
 ./view_gazebo.sh
 ```
 
-Attaches Gazebo's 3D viewport to the headless server — you see the actual drone
+Attaches Gazebo's 3D viewport to the headless server: you see the actual drone
 model, the wall, and the ground plane. Works out of the box on real GPUs / WSL2.
 In the VMware-on-Apple-Silicon VM it requires "Accelerate 3D Graphics" to be
 **disabled** (see gotchas below); expect low framerates there (software
@@ -241,21 +244,21 @@ Gazebo (gz sim -s, headless)
   ├─ /model/drone_1/odometry ──bridge──> drone_pose_to_odom_tf.py ──> /odom + TF (odom->base_link)
   ├─ /clock ──────────────────bridge──> ROS sim time (everything runs use_sim_time)
   └─ /drone_1/gazebo/command/twist <──bridge── /cmd_vel <── Nav2 controller
-                                          /scan <── virtual_lidar.py <── /odom + known obstacles
+                                          /scan <── virtual_lidar.py <── /odom + /obstacles
 ```
 
 Nav2 runs **mapless**: no static map, no AMCL. `map -> odom` is a static identity
 transform; both costmaps are filled purely from `/scan` (obstacle layer + inflation).
 DWB is configured holonomic (`min/max_vel_y` nonzero) so the planner can use the
-drone's ability to strafe — and **fully heading-agnostic**, which took three
+drone's ability to strafe, and **fully heading-agnostic**. That took three
 separate deviations from Nav2 defaults, each discovered through a failing run:
 
-1. `yaw_goal_tolerance: 6.28`, no RotateToGoal critic — requiring a final
+1. `yaw_goal_tolerance: 6.28`, no RotateToGoal critic. Requiring a final
    heading made the drone rotate in place at the goal, which the progress
    checker treats as being stuck.
-2. No PathAlign/GoalAlign critics — heading-alignment scoring forces
+2. No PathAlign/GoalAlign critics. Heading-alignment scoring forces
    rotate-before-translate behavior and stalled every lateral-dominant path.
-3. `max_vel_theta: 0.0` — empirically, any sustained yaw-rate command (e.g.
+3. `max_vel_theta: 0.0`. Empirically, any sustained yaw-rate command (e.g.
    wz=-1.0) stalls the X3's MulticopterVelocityControl completely: correct
    velocities arrive in Gazebo and the drone produces no thrust at all. Pure
    translation works. The drone therefore keeps its spawn heading forever.
@@ -264,35 +267,41 @@ separate deviations from Nav2 defaults, each discovered through a failing run:
 
 The world originally used a `gpu_lidar` sensor, but rendering-based sensors need a
 working GPU context (OGRE2) which this development VM (VMware on Apple Silicon)
-cannot provide reliably — the sensor registers but never publishes. `virtual_lidar.py`
+cannot provide reliably: the sensor registers but never publishes. `virtual_lidar.py`
 computes the identical `LaserScan` analytically (360 rays, ray/box intersection
-against the obstacle footprints listed in `OBSTACLES`) with no rendering at all.
-From Nav2's perspective the output is indistinguishable from a simulated lidar.
-**The `OBSTACLES` list must be kept in sync with the world SDF.** On a machine with
-a working GPU, a real `gpu_lidar` + `gz-sim-sensors-system` + scan bridge can be
-swapped back in.
+against the obstacle footprints) with no rendering at all. From Nav2's
+perspective the output is indistinguishable from a simulated lidar. The
+obstacle footprints come from the scenario's `scenario.yaml` and, while
+running, from the live `/obstacles` topic published by `obstacle_mover.py`, so
+static and moving scenarios use the same code path. On a machine with a working
+GPU, a real `gpu_lidar` + `gz-sim-sensors-system` + scan bridge can be swapped
+back in for static scenarios.
 
 ### Notes / gotchas
 
 - The stock `nav2_bringup navigation_launch.py` (Jazzy) launches extra servers
-  (collision_monitor, route_server, docking...) that fail without their own config —
-  hence the minimal launch file.
+  (collision_monitor, route_server, docking...) that fail without their own
+  config; hence the minimal launch file.
 - ROS `setup.bash` breaks under `set -u`; scripts source it first.
-- Scripts derive their working directory from their own location — do not hardcode
-  absolute paths (this repo is used through a VM shared folder).
+- Scripts derive their working directory from their own location. Do not
+  hardcode absolute paths (this repo is used through a VM shared folder).
 - VMware on Apple Silicon: keep "Accelerate 3D Graphics" **disabled**. Counter-
-  intuitively, enabling it makes the Gazebo GUI hang (buggy SVGA3D driver, and Mesa
-  then refuses the software fallback); disabled, the GUI renders via llvmpipe —
-  slow but stable. Rendering-based sensors (gpu_lidar) work in *neither* mode,
-  hence the virtual lidar. On real GPUs / WSL2 none of this applies.
+  intuitively, enabling it makes the Gazebo GUI hang (buggy SVGA3D driver, and
+  Mesa then refuses the software fallback); disabled, the GUI renders via
+  llvmpipe, which is slow but stable. Rendering-based sensors (gpu_lidar) work
+  in *neither* mode, hence the virtual lidar. On real GPUs / WSL2 none of this
+  applies.
 - RViz on the SVGA3D driver may log a GLSL link error for `indexed_8bit_image`
   (the costmap display shader). Harmless: everything else renders; at worst the
   costmap overlay is blank. Goes away with 3D acceleration disabled.
+- Nav2's `bt_navigator` runs with raised IPC timeouts (`default_server_timeout:
+  200`). With the defaults, Nav2 aborted goals spuriously whenever the
+  RAM-limited VM froze briefly and delayed its internal service calls.
 
 ## Next steps
 
 With the Nav2 baseline established (static sweep + speed-degradation sweep, see
 `results/`), the next phase is the thesis contribution itself: a predictive
-avoidance component on top of Nav2 that uses obstacle velocity — which plain
-Nav2 ignores — to close the gap the speed sweep exposes. The same batch runner
+avoidance component on top of Nav2 that uses obstacle velocity (which plain
+Nav2 ignores) to close the gap the speed sweep exposes. The same batch runner
 and metrics then produce the with/without comparison.
