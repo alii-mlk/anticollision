@@ -11,3 +11,9 @@ nav2/scenarios/
 
 # Batch evaluation output (large; promote citable batches to results/).
 nav2/runs/
+
+# Internal planning notes, not meant for the public repo.
+ROADMAP.md
+
+# PX4 stage logs (same policy as nav2/logs).
+px4/logs/
