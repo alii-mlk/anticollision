@@ -1,8 +1,11 @@
 # anticollision
 
-Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates around obstacles using the ROS 2 Nav2 stack.
+Drone obstacle avoidance in simulation. The project has two stages: a 2D
+baseline built on ROS 2 Nav2, and a 3D stage built on PX4 and MAVLink.
 
-**Status:** the full baseline evaluation of plain Nav2 is complete.
+## Stage 1: Nav2 in 2D (complete)
+
+A quadcopter navigates around obstacles using the ROS 2 Nav2 stack.
 
 - *Static obstacles*: 48/48 randomized runs collision-free across 1–10
   obstacles; navigation time and detour overhead grow mildly with obstacle
@@ -11,15 +14,61 @@ Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates aroun
   speed. Total hits rise from 1 to 73 (8 runs per speed) between 0.2 and
   2.0 m/s, navigation time doubles, and beyond ~0.8 m/s obstacles outrun the
   drone entirely (`results/2026-07-20_speed_sweep/`). This quantifies where
-  prediction-free Nav2 stops being sufficient and motivates the avoidance
-  component to be built on top of it.
+  prediction-free Nav2 stops being sufficient.
+
+## Stage 2: PX4 and MAVLink in 3D (in progress)
+
+Nav2 only plans in 2D, and it is not how real drones are flown. This stage
+replaces it with the standard autopilot stack: PX4 as the flight controller
+and MAVLink as the protocol, so the software is independent of the drone.
+
+Working so far: PX4 SITL with Gazebo, the MAVLink bridge (MAVROS), 3D maze
+scenarios with obstacles standing on the ground, offboard flight to a 3D
+target, and collision detection that destroys the drone on contact.
+
+Note on PX4 3D navigation: PX4 has no maintained 3D path planner. The
+PX4-Avoidance package is archived and ROS 1 only, the path planning interface
+is withdrawn, and the built-in Collision Prevention is horizontal and works
+only in Position mode. Planning therefore happens on the ROS 2 side and PX4
+executes the setpoints, which is what PX4 itself now recommends. Details and
+sources in `px4/FEASIBILITY_3D_NAVIGATION.md`.
+
+## How the pieces fit together
+
+Both stages use the same idea: the simulator provides physics, something
+flies the drone, and our own code decides where it should go.
+
+```
+Stage 1:  our code -> Nav2 -> /cmd_vel -> bridge -> Gazebo
+Stage 2:  our code -> MAVROS -> MAVLink -> PX4 -> Gazebo
+```
+
+In stage 2 the four programs are:
+
+| Program | Role |
+|---|---|
+| Gazebo | the physics world: gravity, the drone's body, the obstacles |
+| PX4 (SITL) | the flight controller, the software version of the board on a real drone. Keeps the drone stable and executes position commands |
+| MAVROS | the translator between PX4's MAVLink protocol and ROS 2 |
+| our Python nodes | the planner: chooses the target, watches for collisions, records metrics |
 
 ## Requirements
+
+Stage 1 (Nav2):
 
 - Ubuntu 24.04 with ROS 2 Jazzy (`/opt/ros/jazzy`)
 - Gazebo (gz-sim, Harmonic) + `ros-jazzy-ros-gz-bridge`
 - `ros-jazzy-navigation2`, `ros-jazzy-nav2-bringup`
 - The X3 UAV model from Gazebo Fuel (auto-downloaded on first `gz sim` run with internet, cached under `~/.gz/fuel`)
+
+Stage 2 (PX4) additionally:
+
+- PX4-Autopilot v1.17.0 built for SITL, outside this repository (see
+  `px4/start_px4_sitl.sh` for the clone and build commands). Do not build it
+  inside a VM shared folder
+- `ros-jazzy-mavros`, `ros-jazzy-mavros-msgs`, `ros-jazzy-mavros-extras`, plus
+  the GeographicLib datasets (`sudo bash
+  /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh`)
 
 ## Repository layout
 
@@ -27,7 +76,25 @@ Drone obstacle avoidance in simulation: a quadcopter (Gazebo X3) navigates aroun
 Thesis Progress.docx          # running progress report
 results/                      # curated, citable run evidence (one folder per experiment)
 early_versions/               # superseded experiments, kept for project history
-nav2/
+
+px4/                          # STAGE 2: PX4 + MAVLink, 3D
+  start_px4_sitl.sh           # boots Gazebo + PX4 SITL (and the heartbeat below);
+                              #   --scenario <dir> spawns the drone at the scenario start
+  stop_px4_sitl.sh            # stops PX4, Gazebo, MAVROS and the heartbeat
+  gcs_heartbeat.py            # PX4 refuses to arm with no ground station watching;
+                              #   this sends the minimal MAVLink heartbeat to satisfy it
+  gen_scenario_3d.py          # random 3D maze: n ground-standing boxes with random
+                              #   footprint and height, k drones with 3D targets -> scenario.yaml
+  spawn_obstacles.py          # inserts those obstacles into the running Gazebo world
+  collision_monitor_3d.py     # 3D collision check; force-disarms ("destroys") the drone on contact
+  run_mission.py              # flies a drone to its target via offboard setpoints,
+                              #   records travelled/Euclidean distance, ratio, time
+  offboard_goto.py            # minimal single-target offboard flight, used to verify the bridge
+  FEASIBILITY_3D_NAVIGATION.md # why PX4 has no usable 3D planner, with sources
+  scenarios3d/                # generated scenarios (gitignored; reproducible from seed)
+  logs/                       # per-terminal logs (gitignored)
+
+nav2/                         # STAGE 1: Nav2, 2D
   drone_nav2_world.sdf        # world: ground plane, obstacle_1 (1x4x2 wall at x=4), X3 drone
                               #   with multicopter motor/velocity-control + OdometryPublisher plugins
   start_drone_stack.sh        # launches Gazebo (headless) + all bridges in separate terminals
@@ -55,7 +122,97 @@ nav2/
   logs/                       # all terminals and runs tee their output here (gitignored)
 ```
 
-## Running (step by step)
+## Stage 2: running a 3D maze mission
+
+Four terminals, in this order. All commands from the `px4/` directory, and
+every ROS terminal needs `source /opt/ros/jazzy/setup.bash` first.
+
+**0. Generate a scenario** (once per experiment; the seed makes it repeatable):
+
+```bash
+./gen_scenario_3d.py --n-obstacles 8 --seed 1     # -> scenarios3d/s1_n8_k1/
+```
+
+**1. Terminal A, the simulator.** Boots Gazebo and PX4, and spawns the drone
+at the scenario's start point. Wait for `Ready for takeoff!` in the PX4 window
+before continuing; it means PX4 has booted and passed its preflight checks.
+
+```bash
+./start_px4_sitl.sh --scenario scenarios3d/s1_n8_k1
+```
+
+Then put the obstacles into the world (the world starts empty):
+
+```bash
+./spawn_obstacles.py --scenario scenarios3d/s1_n8_k1
+```
+
+Expect `Acknowledged 8/8, 8 present in world 'default'`. The count is checked
+against the world itself, because the spawn service acknowledges requests that
+Gazebo may still fail to build.
+
+**2. Terminal B, the MAVLink bridge.** Leave it running. Wait for
+`CON: Got HEARTBEAT, connected. FCU: PX4 Autopilot`.
+
+```bash
+ros2 run mavros mavros_node --ros-args -p fcu_url:="udp://:14540@127.0.0.1:14580"
+```
+
+**3. Terminal C, the collision monitor.** Start it before the mission so it is
+watching from the first moment.
+
+```bash
+./collision_monitor_3d.py --scenario scenarios3d/s1_n8_k1
+```
+
+**4. Terminal D, the mission.** The drone climbs to 3 m, then flies to its 3D
+target.
+
+```bash
+./run_mission.py --scenario scenarios3d/s1_n8_k1
+```
+
+Results:
+
+```bash
+cat scenarios3d/s1_n8_k1/mission.yaml    # outcome, distances, ratio, time
+cat scenarios3d/s1_n8_k1/outcome.yaml    # destroyed?, min clearance, collision point
+```
+
+Teardown: `./stop_px4_sitl.sh`, and Ctrl+C the MAVROS and monitor terminals.
+
+### One-time PX4 parameters
+
+These live in the PX4 build tree and survive restarts, but not a clean
+rebuild. In the PX4 shell (`pxh>`):
+
+```
+param set CBRK_SUPPLY_CHK 894281   # SITL has no real power monitoring
+param set COM_DISARM_PRFLT 0       # do not auto-disarm while idle on the ground
+param set SIM_BAT_MIN_PCT 90       # keep the simulated battery full, so long runs
+                                   #   are not cut short by a low-battery failsafe
+param save
+```
+
+### Notes on the PX4 stage
+
+- **Frames.** Scenario coordinates are Gazebo world coordinates, but MAVROS
+  reports position in PX4's local frame, whose origin is wherever the drone
+  spawned. The nodes convert with `world = local + start`. Getting this wrong
+  sends the drone to a completely different place, so it is worth checking
+  that a reached target's `final_world_position` is close to
+  `target_world_position`.
+- **Destroying a drone.** PX4 refuses an ordinary disarm command in flight
+  ("Disarming denied: not landed"), so the monitor sends
+  `MAV_CMD_COMPONENT_ARM_DISARM` with the force value 21196. Without this the
+  drone survives its own collision and keeps flying, which produced a
+  meaningless travelled distance of 350 m in one test.
+- **Ratio for destroyed runs is not meaningful.** A drone that dies halfway
+  has travelled less than the straight-line distance, giving a ratio below 1.
+  Averages should be taken over successful runs only, with destroyed runs
+  counted separately.
+
+## Stage 1: running Nav2 (step by step)
 
 All commands from the `nav2/` directory.
 
@@ -300,8 +457,20 @@ back in for static scenarios.
 
 ## Next steps
 
-With the Nav2 baseline established (static sweep + speed-degradation sweep, see
-`results/`), the next phase is the thesis contribution itself: a predictive
-avoidance component on top of Nav2 that uses obstacle velocity (which plain
-Nav2 ignores) to close the gap the speed sweep exposes. The same batch runner
-and metrics then produce the with/without comparison.
+The Nav2 baseline is complete (static sweep and speed-degradation sweep, see
+`results/`), and the PX4 stage now flies single drones through 3D mazes.
+
+What remains:
+
+1. **Multiple drones.** Several PX4 instances at once, each with its own
+   target, each able to collide with obstacles and with the other drones. A
+   run ends when every drone has either reached its target or been destroyed.
+   Several PX4 instances plus Gazebo will probably not fit in an 8 GB VM, so
+   this is where the experiments likely move to a stronger machine.
+2. **Batch evaluation over (n, k).** For each combination of obstacle count
+   and drone count: number of collisions, summed Euclidean distance, summed
+   travelled distance, their ratio, simulation time and CPU time.
+3. **The avoidance component.** PX4 provides no 3D avoidance, so the runs
+   above are the "without avoidance" baseline. The thesis contribution is the
+   component that closes that gap, evaluated with the same generator, batch
+   runner and metrics for a with/without comparison.
