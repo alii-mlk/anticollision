@@ -17,6 +17,16 @@ PX4_DIR="${PX4_DIR:-$HOME/px4/PX4-Autopilot}"
 HEADLESS="${HEADLESS:-1}"
 LOGDIR="$WORKDIR/logs"
 
+# Optional: --scenario <dir> spawns the drone at that scenario's start point.
+SCENARIO_DIR=""
+if [ "${1:-}" = "--scenario" ]; then
+  SCENARIO_DIR="$(cd "$2" && pwd)"
+  if [ ! -f "$SCENARIO_DIR/scenario.yaml" ]; then
+    echo "ERROR: $SCENARIO_DIR/scenario.yaml not found" >&2
+    exit 1
+  fi
+fi
+
 if [ ! -d "$PX4_DIR" ]; then
   echo "ERROR: PX4 not found at $PX4_DIR" >&2
   echo "Clone it with:" >&2
@@ -52,9 +62,23 @@ sleep 2
 
 echo "Starting PX4 SITL (gz_x500) from $PX4_DIR ..."
 
+# Spawn pose: PX4 reads PX4_GZ_MODEL_POSE as "x,y,z,roll,pitch,yaw".
+POSE_ENV=""
+if [ -n "$SCENARIO_DIR" ]; then
+  POSE="$(python3 -c "
+import re
+text = open('$SCENARIO_DIR/scenario.yaml').read()
+m = re.search(r'start: \{x: ([-\d.]+), y: ([-\d.]+), z: ([-\d.]+)\}', text)
+print(f'{m.group(1)},{m.group(2)},{m.group(3)},0,0,0')
+")"
+  POSE_ENV="PX4_GZ_MODEL_POSE='$POSE'"
+  echo "Scenario: $SCENARIO_DIR"
+  echo "Drone spawn pose: $POSE"
+fi
+
 open_term "1 PX4 SITL (pxh shell)" "
   cd '$PX4_DIR' &&
-  HEADLESS=$HEADLESS make px4_sitl gz_x500
+  $POSE_ENV HEADLESS=$HEADLESS make px4_sitl gz_x500
 "
 
 # PX4 needs to boot and open its MAVLink port before the heartbeat is useful.

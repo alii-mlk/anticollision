@@ -17,3 +17,7 @@ ROADMAP.md
 
 # PX4 stage logs (same policy as nav2/logs).
 px4/logs/
+
+# Generated 3D scenarios and run output, reproducible from seed.
+px4/scenarios3d/
+px4/runs/
