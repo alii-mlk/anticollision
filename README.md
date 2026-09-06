@@ -7,7 +7,7 @@ baseline built on ROS 2 Nav2, and a 3D stage built on PX4 and MAVLink.
 
 A quadcopter navigates around obstacles using the ROS 2 Nav2 stack.
 
-- *Static obstacles*: 48/48 randomized runs collision-free across 1–10
+- *Static obstacles*: 48/48 randomized runs collision-free across 1-10
   obstacles; navigation time and detour overhead grow mildly with obstacle
   count (`results/2026-07-17_static_sweep/`).
 - *Moving obstacles*: collision avoidance degrades sharply with obstacle
@@ -16,15 +16,16 @@ A quadcopter navigates around obstacles using the ROS 2 Nav2 stack.
   drone entirely (`results/2026-07-20_speed_sweep/`). This quantifies where
   prediction-free Nav2 stops being sufficient.
 
-## Stage 2: PX4 and MAVLink in 3D (in progress)
+## Stage 2: PX4 and MAVLink in 3D (baseline complete)
 
 Nav2 only plans in 2D, and it is not how real drones are flown. This stage
 replaces it with the standard autopilot stack: PX4 as the flight controller
 and MAVLink as the protocol, so the software is independent of the drone.
 
-Working so far: PX4 SITL with Gazebo, the MAVLink bridge (MAVROS), 3D maze
-scenarios with obstacles standing on the ground, offboard flight to a 3D
-target, and collision detection that destroys the drone on contact.
+Working: PX4 SITL with Gazebo, the MAVLink bridge (MAVROS), 3D maze scenarios
+with obstacles standing on the ground, k drones flying at once with a target
+each, collision detection against obstacles and against other drones that
+destroys the drone on contact, and an unattended sweep over (n, k).
 
 Note on PX4 3D navigation: PX4 has no maintained 3D path planner. The
 PX4-Avoidance package is archived and ROS 1 only, the path planning interface
@@ -32,6 +33,34 @@ is withdrawn, and the built-in Collision Prevention is horizontal and works
 only in Position mode. Planning therefore happens on the ROS 2 side and PX4
 executes the setpoints, which is what PX4 itself now recommends. Details and
 sources in `px4/FEASIBILITY_3D_NAVIGATION.md`.
+
+Because there was no avoidance system to install, the drones in this stage fly
+straight at their targets. That makes the sweep below a "without avoidance"
+baseline, which is the measurement the avoidance component has to be compared
+against.
+
+**Sweep results** (n in {4, 8, 12, 16, 20}, k in {1, 2, 3}, 5 seeds each, 75
+runs, `results/2026-09-06_3d_sweep/`):
+
+- Collisions per run rise with obstacle count at every drone count. For k = 3
+  they go from 1.2 at n = 4 to 2.0 at n = 20.
+- The share of drones reaching their target falls the same way. For k = 1 it
+  goes from 60% at n = 4 to 20% at n = 20.
+- Ratio over the drones that arrive stays between 1.09 and 1.11 in every
+  configuration, because without avoidance they fly almost straight. All of
+  the degradation is in how many drones survive, not in how long their paths
+  are.
+- CPU time depends on the number of drones and not on the number of
+  obstacles: about 14 s, 32 s and 50 s per run for k = 1, 2 and 3.
+
+Drone-to-drone collisions do occur, and more often when there are few
+obstacles (0.4 per run at n = 4, k = 3), because the drones then fly straighter
+and cross each other's paths more.
+
+The same seed produces the same drone start and target points at every n, so
+the summed Euclidean distance is identical down each k column (21.5, 37.6 and
+53.3 m for k = 1, 2, 3). Obstacle density is varied against a fixed set of
+flights.
 
 ## How the pieces fit together
 
@@ -78,20 +107,33 @@ results/                      # curated, citable run evidence (one folder per ex
 early_versions/               # superseded experiments, kept for project history
 
 px4/                          # STAGE 2: PX4 + MAVLink, 3D
-  start_px4_sitl.sh           # boots Gazebo + PX4 SITL (and the heartbeat below);
+  start_px4_sitl.sh           # boots Gazebo + PX4 SITL for ONE drone (and the heartbeat below);
                               #   --scenario <dir> spawns the drone at the scenario start
-  stop_px4_sitl.sh            # stops PX4, Gazebo, MAVROS and the heartbeat
+  start_px4_multi.sh          # the same for k drones: k PX4 instances sharing one Gazebo world,
+                              #   a heartbeat and a MAVROS each, then the SITL parameters
+  stop_px4_sitl.sh            # stops PX4, Gazebo, MAVROS, the heartbeats and the clock bridge
   gcs_heartbeat.py            # PX4 refuses to arm with no ground station watching;
-                              #   this sends the minimal MAVLink heartbeat to satisfy it
+                              #   this sends the minimal MAVLink heartbeat to satisfy it,
+                              #   and applies the SITL parameters with --set NAME=VALUE
   gen_scenario_3d.py          # random 3D maze: n ground-standing boxes with random
                               #   footprint and height, k drones with 3D targets -> scenario.yaml
   spawn_obstacles.py          # inserts those obstacles into the running Gazebo world
-  collision_monitor_3d.py     # 3D collision check; force-disarms ("destroys") the drone on contact
-  run_mission.py              # flies a drone to its target via offboard setpoints,
+  collision_monitor_3d.py     # 3D collision check against obstacles and other drones;
+                              #   force-disarms ("destroys") the drone on contact
+  run_mission.py              # flies one drone to its target via offboard setpoints,
                               #   records travelled/Euclidean distance, ratio, time
+  run_multi_mission.py        # runs a whole scenario: k missions + k monitors, then the summary
+  run_batch_3d.py             # unattended sweep over (n, k, seed) -> runs3d/batch_<ts>/
+  compute_metrics_3d.py       # batch dir -> metrics.csv + the per-(n,k) table
+  sim_speed.py                # real time factor of the running simulation, and which
+                              #   processes are using the CPU
+  set_sim_speed.py            # slows Gazebo down deliberately, for a machine that cannot
+                              #   keep up (see the note below)
+  collect_diagnostics.sh      # dumps everything needed to debug a bad run into logs/
   offboard_goto.py            # minimal single-target offboard flight, used to verify the bridge
   FEASIBILITY_3D_NAVIGATION.md # why PX4 has no usable 3D planner, with sources
   scenarios3d/                # generated scenarios (gitignored; reproducible from seed)
+  runs3d/                     # batch outputs (gitignored; promote keepers to results/)
   logs/                       # per-terminal logs (gitignored)
 
 nav2/                         # STAGE 1: Nav2, 2D
@@ -181,18 +223,84 @@ cat scenarios3d/s1_n8_k1/outcome.yaml    # destroyed?, min clearance, collision 
 
 Teardown: `./stop_px4_sitl.sh`, and Ctrl+C the MAVROS and monitor terminals.
 
-### One-time PX4 parameters
+## Stage 2: running k drones
 
-These live in the PX4 build tree and survive restarts, but not a clean
-rebuild. In the PX4 shell (`pxh>`):
+`start_px4_multi.sh` does the whole bring-up, so this needs two terminals
+rather than four. Generate a scenario with more than one drone:
+
+```bash
+./gen_scenario_3d.py --n-obstacles 10 --k-drones 3 --seed 21
+```
+
+```bash
+./start_px4_multi.sh --scenario scenarios3d/s21_n10_k3
+```
+
+This starts the PX4 instances one at a time, waiting for each to report
+`Ready for takeoff!` before starting the next, then one heartbeat and one
+MAVROS per drone, then the Gazebo clock bridge, then the SITL parameters. It
+takes a few minutes. Two things in its output are worth reading:
 
 ```
-param set CBRK_SUPPLY_CHK 894281   # SITL has no real power monitoring
-param set COM_DISARM_PRFLT 0       # do not auto-disarm while idle on the ground
-param set SIM_BAT_MIN_PCT 90       # keep the simulated battery full, so long runs
-                                   #   are not cut short by a low-battery failsafe
-param save
+/uav0 connected (MY ID 1.191, TARGET ID 1.1)
+/uav1 connected (MY ID 2.191, TARGET ID 2.1)
+/uav2 connected (MY ID 3.191, TARGET ID 3.1)
 ```
+
+The target IDs must be 1.1, 2.1, 3.1 and not three times 1.1 (see the note on
+system IDs below), and every drone must report `PARAMS DONE`. It finishes with
+a `READY` banner and writes `logs/stack_ready`.
+
+Then, in the second terminal:
+
+```bash
+./spawn_obstacles.py --scenario scenarios3d/s21_n10_k3
+./run_multi_mission.py --scenario scenarios3d/s21_n10_k3 --timeout 180
+```
+
+`run_multi_mission.py` waits for `logs/stack_ready` before it starts, so it
+cannot begin flying while the parameters are still being applied. It prints a
+per-drone table and writes `run/summary.yaml`.
+
+## Stage 2: the (n, k) sweep
+
+Fully unattended. It generates each scenario, brings the stack up, spawns the
+obstacles, flies, records, and tears everything down before the next run.
+
+```bash
+./run_batch_3d.py --n 4 8 12 16 20 --k 1 2 3 --seeds 1 2 3 4 5 --timeout 180
+./compute_metrics_3d.py runs3d/batch_<timestamp>
+```
+
+That is 75 runs and takes about 100 minutes. `--timeout` is in **simulated**
+seconds. Keep the machine on mains power and stop it sleeping, or it throttles
+and the later runs get slower than the early ones. Sleeping does not corrupt
+the results, because simulated time comes from Gazebo's clock and CPU time
+from the process accounting, but it does distort the `wall(s)` and `rtf`
+columns.
+
+The metrics table reports two ratios. `ratio` is over every drone, which is
+the metric as specified. `ratio+` is over only the drones that reached their
+target, and is the one that says how efficient a completed path was. They
+differ because a destroyed drone contributes the distance it managed against
+the full distance it was asked to cover, which pulls `ratio` below 1.
+
+### SITL parameters
+
+These are applied automatically, by the heartbeat process, over MAVLink:
+
+```
+CBRK_SUPPLY_CHK 894281   # SITL has no real power monitoring
+COM_DISARM_PRFLT 0       # do not auto-disarm while idle on the ground
+SIM_BAT_MIN_PCT 90       # keep the simulated battery full, so long runs
+                         #   are not cut short by a low-battery failsafe
+```
+
+They used to be set through MAVROS, which does not work with more than one
+drone: MAVROS downloads the autopilot's whole parameter list before it will
+set anything, and with three instances that download does not finish, so every
+attempt fails with "Unknown parameter to set". `ros2 param set` reports
+success anyway, so the failure was silent.
 
 ### Notes on the PX4 stage
 
@@ -207,10 +315,32 @@ param save
   `MAV_CMD_COMPONENT_ARM_DISARM` with the force value 21196. Without this the
   drone survives its own collision and keeps flying, which produced a
   meaningless travelled distance of 350 m in one test.
-- **Ratio for destroyed runs is not meaningful.** A drone that dies halfway
-  has travelled less than the straight-line distance, giving a ratio below 1.
-  Averages should be taken over successful runs only, with destroyed runs
-  counted separately.
+- **MAVLink system IDs.** PX4 gives instance *i* the system ID *i+1*, while
+  MAVROS addresses system 1 unless it is told otherwise. Left at the default,
+  every MAVROS talks to instance 0: the others log
+  `Ignore command 400 from 1/191 to 1/1` and their drones can never arm. The
+  unanswered commands are then retried until two acknowledgements race and
+  MAVROS aborts with `std::future_error: Promise already satisfied`. Each
+  MAVROS therefore gets `-p tgt_system:=<i+1>`. This was the reason three
+  drones appeared not to work at all.
+- **Start the MAVROS nodes one at a time.** Started together they all
+  broadcast their version request at once, the replies time out, and the same
+  promise race follows.
+- **Ratio for destroyed runs is not meaningful on its own.** A drone that dies
+  halfway has travelled less than the straight-line distance, giving a ratio
+  below 1. This is why the metrics table reports `ratio+` alongside `ratio`.
+- **`Accel #0 fail: TIMEOUT` at startup is harmless.** It appears when a later
+  instance spawns its model into the shared Gazebo world, which stalls the
+  sensor stream for a moment. The last instance to start never sees it. It
+  scales with drone count, which makes it look like a performance limit, but
+  it is not: with three drones flying, Gazebo uses about 40% of one core and
+  the simulation runs at 0.99 of real time.
+- **If a machine cannot keep up**, `sim_speed.py` measures the real time
+  factor and `set_sim_speed.py` slows Gazebo down to a speed it can hold. An
+  even slowdown is harmless, since simulated time, distances and collisions
+  are unaffected and the run simply takes longer. What breaks a run is the
+  simulator falling behind unevenly, because the autopilot then decides its
+  sensors are dead.
 
 ## Stage 1: running Nav2 (step by step)
 
@@ -271,7 +401,7 @@ obstacles, count hits instead of stopping).
 Placement rules baked into the generator (constants at the top of
 `gen_scenario.py`): workspace `[-9, 9]²`, start↔goal at least 8 m apart, 1.8 m
 obstacle-free zone around start and goal, ≥ 0.4 m gap between obstacles,
-footprints 0.5–2 m × 0.5–4 m, heights 2–3 m (always intersecting the 1 m
+footprints 0.5-2 m × 0.5-4 m, heights 2-3 m (always intersecting the 1 m
 flight altitude). It writes the world SDF **and** `scenario.yaml` from one
 source, so the simulation, the virtual lidar, and the hit monitor always agree
 on where the obstacles are.
@@ -321,7 +451,7 @@ Nav2, waits for readiness, arms the drone, sends the scenario goal with a
 timeout, records all artifacts under `runs/batch_<timestamp>/n<N>_s<seed>/`
 (feedback stream, hits, every component's log, final status), tears everything
 down, and continues. Failures are recorded (`STACK_FAIL` / `NAV2_FAIL` /
-`TIMEOUT`) without stopping the batch. Expect roughly 1.5–2.5 min per run on
+`TIMEOUT`) without stopping the batch. Expect roughly 1.5-2.5 min per run on
 the VM; a full default sweep (30 runs) is about an hour.
 
 ```bash
@@ -362,7 +492,7 @@ Measured result (N = 6, 8 seeds per speed, `results/2026-07-20_speed_sweep/`):
 goal completion never fails, because runs are not stopped on contact, but hits
 rise 1 → 73 across 0.2 → 2.0 m/s (~9 per flight at the top speed), navigation
 time grows 32 → 71 s, and the path ratio approaches 2×. The drone's own top
-speed is ~0.6–0.7 m/s, so beyond ~0.8 m/s obstacles outrun it and Nav2's
+speed is ~0.6-0.7 m/s, so beyond ~0.8 m/s obstacles outrun it and Nav2's
 prediction-free replanning cannot compensate.
 
 ## Visualization
@@ -458,19 +588,15 @@ back in for static scenarios.
 ## Next steps
 
 The Nav2 baseline is complete (static sweep and speed-degradation sweep, see
-`results/`), and the PX4 stage now flies single drones through 3D mazes.
+`results/`), and the PX4 stage now flies k drones through 3D mazes and has its
+full (n, k) sweep (`results/2026-09-06_3d_sweep/`).
 
-What remains:
+What remains is **the avoidance component**. PX4 provides no 3D avoidance, so
+everything measured so far is the "without avoidance" baseline. The thesis
+contribution is the component that closes that gap.
 
-1. **Multiple drones.** Several PX4 instances at once, each with its own
-   target, each able to collide with obstacles and with the other drones. A
-   run ends when every drone has either reached its target or been destroyed.
-   Several PX4 instances plus Gazebo will probably not fit in an 8 GB VM, so
-   this is where the experiments likely move to a stronger machine.
-2. **Batch evaluation over (n, k).** For each combination of obstacle count
-   and drone count: number of collisions, summed Euclidean distance, summed
-   travelled distance, their ratio, simulation time and CPU time.
-3. **The avoidance component.** PX4 provides no 3D avoidance, so the runs
-   above are the "without avoidance" baseline. The thesis contribution is the
-   component that closes that gap, evaluated with the same generator, batch
-   runner and metrics for a with/without comparison.
+The measurement side is already in place, so adding it means changing one
+thing: `run_mission.py` currently publishes a setpoint straight at the target,
+and that is the only place where a path is decided. The comparison would then
+use the same generator, the same seeds and the same metrics, so the two arms
+are directly comparable.

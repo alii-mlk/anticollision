@@ -34,7 +34,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
 from std_msgs.msg import Bool
 from mavros_msgs.srv import CommandBool, CommandLong
 
@@ -79,12 +79,16 @@ def distance_to_box(px, py, pz, box):
 
 
 class CollisionMonitor3D(Node):
-    def __init__(self, obstacles, start, radius, out_dir, namespace):
+    def __init__(self, obstacles, drones, radius, out_dir, mavros_ns, drone_id):
         super().__init__("collision_monitor_3d")
 
         self.obstacles = obstacles
-        self.start = start
+        self.drone_id = drone_id
+        self.start = drones[drone_id]["start"]
         self.radius = radius
+        # Live world positions of the other drones, so a collision between two
+        # drones is detected as well as one with an obstacle.
+        self.other_positions = {}
         self.out_file = out_dir / "outcome.yaml"
         self.out_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -94,59 +98,115 @@ class CollisionMonitor3D(Node):
             depth=10,
         )
 
-        prefix = f"/{namespace}" if namespace else ""
+        # MAVROS's own namespace, not a prefix added in front of one. Running
+        # mavros_node with __ns:=/uav0 replaces its default /mavros namespace,
+        # so the topics are /uav0/state rather than /uav0/mavros/state.
+        ns = mavros_ns.rstrip("/")
         self.create_subscription(
-            PoseStamped, f"{prefix}/mavros/local_position/pose",
+            PoseStamped, f"{ns}/local_position/pose",
             self.pose_cb, sensor_qos)
-        self.arming_client = self.create_client(
-            CommandBool, f"{prefix}/mavros/cmd/arming")
-        self.command_client = self.create_client(
-            CommandLong, f"{prefix}/mavros/cmd/command")
+        self.arming_client = self.create_client(CommandBool, f"{ns}/cmd/arming")
+        self.command_client = self.create_client(CommandLong, f"{ns}/cmd/command")
         # Announce destruction so the mission runner can stop immediately
         # rather than inferring it from the armed flag.
         self.destroyed_pub = self.create_publisher(
-            Bool, f"{prefix}/collision_monitor/destroyed", 10)
+            Bool, f"/collision_monitor/drone{drone_id}/destroyed", 10)
+        # Once the mission ends, stop judging collisions: PX4 leaves offboard
+        # and descends on its own, and anything it touches then is not a
+        # navigation failure.
+        self.create_subscription(
+            Bool, f"/mission/drone{drone_id}/done", self.mission_done_cb, 10)
+
+        # Every drone's world position is published on a common topic so the
+        # monitors can see each other. A monitor keeps watching a destroyed
+        # drone's last position: a wreck stays where it fell and remains a
+        # hazard for the others.
+        self.world_pos_pub = self.create_publisher(
+            PointStamped, f"/drone_world_position/drone{drone_id}", 10)
+        for other in range(len(drones)):
+            if other == drone_id:
+                continue
+            self.create_subscription(
+                PointStamped, f"/drone_world_position/drone{other}",
+                self.make_other_cb(other), 10)
 
         self.world_pos = None
         self.min_clearance = math.inf
         self.destroyed = False
         self.destroyed_at = None
+        self.collided_with = None
         self.samples = 0
+        self.mission_done = False
 
         self.timer = self.create_timer(1.0 / CHECK_RATE_HZ, self.write_outcome)
 
+        s = self.start
         self.get_logger().info(
-            f"Collision monitor active: {len(obstacles)} obstacle(s), "
+            f"Collision monitor active for drone {drone_id}: "
+            f"{len(obstacles)} obstacle(s), {len(drones) - 1} other drone(s), "
             f"drone radius {radius:.2f} m, "
-            f"world offset ({start[0]:.2f}, {start[1]:.2f}, {start[2]:.2f})."
+            f"world offset ({s[0]:.2f}, {s[1]:.2f}, {s[2]:.2f})."
         )
 
-    def pose_cb(self, msg):
-        if self.destroyed:
-            return
+    def make_other_cb(self, other_id):
+        def cb(msg):
+            self.other_positions[other_id] = (msg.point.x, msg.point.y,
+                                              msg.point.z)
+        return cb
 
+    def mission_done_cb(self, msg):
+        if msg.data and not self.mission_done:
+            self.mission_done = True
+            self.get_logger().info(
+                "Mission finished; no longer checking for collisions.")
+
+    def pose_cb(self, msg):
         p = msg.pose.position
         # MAVROS local frame has its origin at the drone's spawn point.
         wx = p.x + self.start[0]
         wy = p.y + self.start[1]
         wz = p.z + self.start[2]
+
+        # Keep publishing even once destroyed or finished: a wreck stays where
+        # it fell and the other drones still have to avoid it.
         self.world_pos = (wx, wy, wz)
+        point = PointStamped()
+        point.header.stamp = self.get_clock().now().to_msg()
+        point.header.frame_id = "world"
+        point.point.x, point.point.y, point.point.z = wx, wy, wz
+        self.world_pos_pub.publish(point)
+
+        if self.destroyed or self.mission_done:
+            return
+
         self.samples += 1
 
-        clearance = min(
+        obstacle_clearance = min(
             (distance_to_box(wx, wy, wz, b) for b in self.obstacles),
             default=math.inf,
         ) - self.radius
+
+        # Two drones collide when their spheres touch, so the gap closes at
+        # twice the radius.
+        drone_clearance = min(
+            (math.dist((wx, wy, wz), q) for q in self.other_positions.values()),
+            default=math.inf,
+        ) - 2 * self.radius
+
+        clearance = min(obstacle_clearance, drone_clearance)
         self.min_clearance = min(self.min_clearance, clearance)
 
         if clearance <= 0.0:
-            self.destroy_drone(wx, wy, wz)
+            kind = ("another drone" if drone_clearance <= obstacle_clearance
+                    else "an obstacle")
+            self.destroy_drone(wx, wy, wz, kind)
 
-    def destroy_drone(self, wx, wy, wz):
+    def destroy_drone(self, wx, wy, wz, kind="an obstacle"):
         self.destroyed = True
         self.destroyed_at = (wx, wy, wz)
+        self.collided_with = kind
         self.get_logger().error(
-            f"COLLISION at world ({wx:.2f}, {wy:.2f}, {wz:.2f}). "
+            f"COLLISION with {kind} at world ({wx:.2f}, {wy:.2f}, {wz:.2f}). "
             f"Destroying the drone."
         )
 
@@ -170,10 +230,19 @@ class CollisionMonitor3D(Node):
 
         self.write_outcome()
 
-    def write_outcome(self):
+    def write_outcome(self, publish=True):
         # Keep announcing the destroyed state: the mission runner may start or
         # reconnect after the collision happened.
-        self.destroyed_pub.publish(Bool(data=self.destroyed))
+        #
+        # On shutdown the ROS context is already being torn down and the
+        # publish raises. Since the publish comes first, that used to abort the
+        # method before it wrote the file, so the final outcome.yaml was never
+        # saved and every run ended with a traceback.
+        if publish:
+            try:
+                self.destroyed_pub.publish(Bool(data=self.destroyed))
+            except Exception:
+                pass
 
         if self.samples == 0:
             return
@@ -192,6 +261,7 @@ class CollisionMonitor3D(Node):
             dx, dy, dz = self.destroyed_at
             lines.append(f"collision_position: {{x: {dx:.3f}, y: {dy:.3f}, "
                          f"z: {dz:.3f}}}")
+            lines.append(f"collided_with: {self.collided_with}")
         self.out_file.write_text("\n".join(lines) + "\n")
 
 
@@ -200,8 +270,9 @@ def main():
     ap.add_argument("--scenario", type=Path, required=True)
     ap.add_argument("--drone-id", type=int, default=0)
     ap.add_argument("--drone-radius", type=float, default=DRONE_RADIUS)
-    ap.add_argument("--namespace", default="",
-                    help="MAVROS namespace for multi-drone runs (e.g. uav0)")
+    ap.add_argument("--mavros-ns", default="/mavros",
+                    help="MAVROS namespace: /mavros for a single drone, "
+                         "/uav0, /uav1, ... for multi-drone runs")
     ap.add_argument("--out", type=Path, default=None,
                     help="output directory (default: the scenario directory)")
     args = ap.parse_args()
@@ -218,15 +289,15 @@ def main():
 
     rclpy.init()
     node = CollisionMonitor3D(
-        obstacles, drones[args.drone_id]["start"], args.drone_radius,
-        out_dir, args.namespace)
+        obstacles, drones, args.drone_radius,
+        out_dir, args.mavros_ns, args.drone_id)
 
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.write_outcome()
+        node.write_outcome(publish=False)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

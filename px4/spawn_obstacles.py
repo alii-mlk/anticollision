@@ -72,6 +72,23 @@ def box_sdf(name, cx, cy, cz, sx, sy, sz):
 </sdf>"""
 
 
+def require_running_simulation(world):
+    """Fail fast and clearly if no Gazebo is up.
+
+    Without this every service call times out in turn and the script looks
+    like it is hanging, when the real problem is that nothing is running.
+    """
+    ok, out = run_gz(["topic", "-l"], timeout=8)
+    if not ok or not out.strip():
+        sys.exit(
+            "ERROR: no running Gazebo simulation found.\n"
+            "Start the simulator first, for example:\n"
+            "  ./start_px4_sitl.sh --scenario <dir>          (single drone)\n"
+            "  ./start_px4_multi.sh --scenario <dir>         (k drones)\n"
+            "and wait for 'Ready for takeoff!' before spawning obstacles."
+        )
+
+
 def existing_obstacle_names(world):
     ok, out = run_gz(["model", "--list"])
     if not ok:
@@ -143,6 +160,8 @@ def main():
     ap.add_argument("--clear", action="store_true",
                     help="only remove existing obstacles, do not spawn")
     args = ap.parse_args()
+
+    require_running_simulation(args.world)
 
     if args.clear:
         clear_obstacles(args.world)

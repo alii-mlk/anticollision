@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Raw run logs are regenerated on every run (and get large — a single goal
+# Raw run logs are regenerated on every run, and they get large (a single goal
 # log can be ~10 MB of feedback stream). Keep curated runs in results/ instead.
 nav2/logs/
 
@@ -21,3 +21,5 @@ px4/logs/
 # Generated 3D scenarios and run output, reproducible from seed.
 px4/scenarios3d/
 px4/runs/
+px4/runs3d/
+px4/runs_k2/
