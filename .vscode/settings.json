@@ -5,13 +5,13 @@
         "titleBar.activeForeground": "#FFFFFF",
         "titleBar.inactiveBackground": "#322E0E",
         "titleBar.inactiveForeground": "#FFFFFF",
-        "statusBar.background": "#464114",
         "statusBar.debuggingBackground": "#464114",
         "statusBar.noFolderBackground": "#464114",
         "activityBar.foreground": "#FFFFFF",
         "activityBar.inactiveForeground": "#FFFFFF",
-        "statusBar.foreground": "#FFFFFF",
         "statusBar.debuggingForeground": "#FFFFFF",
-        "statusBar.noFolderForeground": "#FFFFFF"
+        "statusBar.noFolderForeground": "#FFFFFF",
+        "statusBar.background": "#464114",
+        "statusBar.foreground": "#FFFFFF"
     }
 }
