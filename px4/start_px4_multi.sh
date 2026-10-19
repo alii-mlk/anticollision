@@ -183,11 +183,18 @@ for ((i = 0; i < K; i++)); do
   # connection. MAVROS did this before, but it downloads the autopilot's whole
   # parameter list first, and with several instances that download does not
   # finish, so every attempt fails with "Unknown parameter to set".
+  #
+  # SDLOG_MODE=-1 switches PX4's own flight logs off. Each instance writes 40
+  # to 60 MB of them per flight, which over two 75-run sweeps is about 15 GB
+  # into the VM's disk and through it the Mac's, and none of our results come
+  # from them. PX4 reads this at boot and keeps parameters per instance, so it
+  # takes effect from the next start onwards.
   GCS_PORT=$((18570 + i))
   ( cd "$WORKDIR" && python3 gcs_heartbeat.py --port "$GCS_PORT" \
       --set CBRK_SUPPLY_CHK=894281 \
       --set COM_DISARM_PRFLT=0 \
-      --set SIM_BAT_MIN_PCT=90 ) \
+      --set SIM_BAT_MIN_PCT=90 \
+      --set SDLOG_MODE=-1 ) \
     > "$LOGDIR/heartbeat_$i.txt" 2>&1 &
   echo "    heartbeat -> udp $GCS_PORT"
 

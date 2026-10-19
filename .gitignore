@@ -23,3 +23,7 @@ px4/scenarios3d/
 px4/runs/
 px4/runs3d/
 px4/runs_k2/
+
+# RL stage: logs, training runs and checkpoints are regenerated.
+rl/logs/
+rl/runs/

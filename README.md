@@ -1,7 +1,10 @@
 # anticollision
 
-Drone obstacle avoidance in simulation. The project has two stages: a 2D
-baseline built on ROS 2 Nav2, and a 3D stage built on PX4 and MAVLink.
+Drone obstacle avoidance in simulation. The project has three stages: a 2D
+baseline built on ROS 2 Nav2, a 3D stage built on PX4 and MAVLink that
+measures k drones flying through mazes without avoidance, and an avoidance
+policy trained with reinforcement learning and compared against that baseline
+on the same scenarios.
 
 ## Stage 1: Nav2 in 2D (complete)
 
@@ -62,14 +65,55 @@ the summed Euclidean distance is identical down each k column (21.5, 37.6 and
 53.3 m for k = 1, 2, 3). Obstacle density is varied against a fixed set of
 flights.
 
+## Stage 3: avoidance with reinforcement learning (complete)
+
+A neural network decides which way each drone flies. Its input is a 3D lidar
+scan plus the target, and its output is a direction. It is trained with PPO
+(Stable-Baselines3, an actor-critic method) in MuJoCo through the
+MuJoCo-Drones-Gym package, because training inside Gazebo and PX4 would take
+far too long, and it is then flown in Gazebo with PX4 without any further
+training.
+
+The lidar is computed by our own code (`rl/lidar.py`, analytic rays against
+the obstacle boxes, the ground and the other drones), so the network sees the
+same scan in both simulators. The output is a direction rather than motor
+commands, and each simulator's own controller turns it into flight. Flying
+straight, the MuJoCo environment
+gives the same outcome as Gazebo on all 25 single-drone scenarios of the
+stage 2 sweep, and the observation built during a Gazebo flight is identical to
+the one in training.
+
+**Sweep results** (the same 75 scenarios as stage 2, both arms flown on
+2026-10-19, `results/2026-10-19_rl_sweep/`):
+
+- Drones reaching their target: 74/150 (49%) flying straight, 135/150 (90%)
+  with the policy. Destroyed drones: 76 and 15.
+- Same drone, same scenario: the policy saved 61 drones and lost none.
+- `ratio+` rises from 1.09-1.11 to 1.13-1.34 and grows with obstacle count,
+  because the drones now fly around the obstacles.
+- No collisions between drones with the policy (3 flying straight), and no two
+  drones closer than 2.66 m.
+- Costs: missions take about 30 s instead of 12 s (the policy flies at the
+  1.04 m/s it was trained at), and the network adds about 3.5 s of CPU time to
+  a one-drone mission.
+- Weak points: the crash rate rises with drone count (4%, 6% and 15% of drones
+  for k = 1, 2, 3; none of these crashes happened near another drone), and the
+  drones it saves often pass close to an obstacle (median 0.45 m).
+
+The straight arm was re-run rather than reused, because a system update had
+changed MAVROS, Gazebo and the bridge after September. It reproduces the
+September sweep: 72 of 75 runs identical and the same totals.
+
 ## How the pieces fit together
 
-Both stages use the same idea: the simulator provides physics, something
+All three stages use the same idea: the simulator provides physics, something
 flies the drone, and our own code decides where it should go.
 
 ```
 Stage 1:  our code -> Nav2 -> /cmd_vel -> bridge -> Gazebo
 Stage 2:  our code -> MAVROS -> MAVLink -> PX4 -> Gazebo
+Stage 3:  lidar + policy network -> velocity setpoint -> MAVROS -> MAVLink -> PX4 -> Gazebo
+          (trained beforehand in MuJoCo, with the same lidar code)
 ```
 
 In stage 2 the four programs are:
@@ -80,6 +124,10 @@ In stage 2 the four programs are:
 | PX4 (SITL) | the flight controller, the software version of the board on a real drone. Keeps the drone stable and executes position commands |
 | MAVROS | the translator between PX4's MAVLink protocol and ROS 2 |
 | our Python nodes | the planner: chooses the target, watches for collisions, records metrics |
+
+Stage 3 changes only the planner. `run_mission.py --policy` replaces the
+straight-line setpoint with the network's direction. Everything else, from the
+scenarios to the collision monitor and the metrics, is the same code.
 
 ## Requirements
 
@@ -97,7 +145,16 @@ Stage 2 (PX4) additionally:
   inside a VM shared folder
 - `ros-jazzy-mavros`, `ros-jazzy-mavros-msgs`, `ros-jazzy-mavros-extras`, plus
   the GeographicLib datasets (`sudo bash
-  /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh`)
+  /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh`). The September
+  sweep ran on MAVROS 2.14 and the October sweeps on 2.16. 2.16 moved its
+  topics from `/uavN/...` to `/uavN/mavros/...`, so the nodes look the prefix
+  up (`px4/mavros_ns.py`) instead of assuming it
+
+Stage 3 (RL) additionally:
+
+- a Python venv at `~/rlenv` with MuJoCo, Gymnasium, Stable-Baselines3, PyTorch
+  (CPU build) and MuJoCo-Drones-Gym, created by `rl/setup_env.sh`. Every
+  terminal that trains or flies the policy needs `source rl/env.sh` first
 
 ## Repository layout
 
@@ -105,6 +162,30 @@ Stage 2 (PX4) additionally:
 Thesis Progress.docx          # running progress report
 results/                      # curated, citable run evidence (one folder per experiment)
 early_versions/               # superseded experiments, kept for project history
+
+rl/                           # STAGE 3: reinforcement learning avoidance
+  setup_env.sh                # one-time setup of the venv ~/rlenv (CPU PyTorch, MuJoCo,
+                              #   Gymnasium, Stable-Baselines3, MuJoCo-Drones-Gym)
+  env.sh                      # source it in every RL terminal: ROS first, then the venv
+  smoke_test.py               # checks each piece of the toolchain on its own
+  verify_venv.py              # checks every installed file against its package record;
+                              #   --fix reinstalls damaged packages (after a full disk)
+  lidar.py                    # the 3D lidar: 82 analytic rays against boxes, ground and
+                              #   other drones, shared by training and the Gazebo flights
+  test_lidar.py               # hand-worked distances plus a random-maze geometric check
+  env.py                      # Gymnasium environment: random maze from gen_scenario_3d.py,
+                              #   MuJoCo or point-mass flight, reward, geometric collisions
+  check_env.py                # interface check, calibration, and straight flight compared
+                              #   with the Gazebo sweep scenario by scenario
+  diagnose_flight.py          # shows the MuJoCo-Drones-Gym controller bug (see stage 3 notes)
+  train.py                    # PPO training with periodic evaluation -> runs/<name>/
+  policy.py                   # loads a trained run for the Gazebo side: observation in,
+                              #   velocity setpoint out
+  evaluate.py                 # flies the 25 single-drone scenarios in MuJoCo through
+                              #   policy.py and checks its observation against training
+  runs/                       # training output (gitignored; the evaluated model is
+                              #   copied into results/2026-10-19_rl_sweep/model/)
+  logs/                       # (gitignored)
 
 px4/                          # STAGE 2: PX4 + MAVLink, 3D
   start_px4_sitl.sh           # boots Gazebo + PX4 SITL for ONE drone (and the heartbeat below);
@@ -121,10 +202,14 @@ px4/                          # STAGE 2: PX4 + MAVLink, 3D
   collision_monitor_3d.py     # 3D collision check against obstacles and other drones;
                               #   force-disarms ("destroys") the drone on contact
   run_mission.py              # flies one drone to its target via offboard setpoints,
-                              #   records travelled/Euclidean distance, ratio, time
+                              #   records travelled/Euclidean distance, ratio, time;
+                              #   --policy <run dir> steers it with the trained network
   run_multi_mission.py        # runs a whole scenario: k missions + k monitors, then the summary
   run_batch_3d.py             # unattended sweep over (n, k, seed) -> runs3d/batch_<ts>/
   compute_metrics_3d.py       # batch dir -> metrics.csv + the per-(n,k) table
+  compare_sweeps_3d.py        # a straight batch against a policy batch: per configuration,
+                              #   per drone (saved / lost), clearances and drone separation
+  mavros_ns.py                # finds the namespace MAVROS publishes under (it changed in 2.16)
   sim_speed.py                # real time factor of the running simulation, and which
                               #   processes are using the CPU
   set_sim_speed.py            # slows Gazebo down deliberately, for a machine that cannot
@@ -294,6 +379,8 @@ CBRK_SUPPLY_CHK 894281   # SITL has no real power monitoring
 COM_DISARM_PRFLT 0       # do not auto-disarm while idle on the ground
 SIM_BAT_MIN_PCT 90       # keep the simulated battery full, so long runs
                          #   are not cut short by a low-battery failsafe
+SDLOG_MODE -1            # no PX4 flight logs (.ulg); nothing here reads them,
+                         #   and over a sweep they would fill the disk
 ```
 
 They used to be set through MAVROS, which does not work with more than one
@@ -326,6 +413,12 @@ success anyway, so the failure was silent.
 - **Start the MAVROS nodes one at a time.** Started together they all
   broadcast their version request at once, the replies time out, and the same
   promise race follows.
+- **One flight per stack start.** After a mission the drones are left in the
+  air or in return-to-launch, so a second mission on the same stack would start
+  airborne and count the descent as travelled distance. `run_mission.py`
+  refuses to start (outcome `not_at_start`) unless the drone is on the ground,
+  disarmed and at its start point. Restart the stack between flights; the
+  batch runner already does.
 - **Ratio for destroyed runs is not meaningful on its own.** A drone that dies
   halfway has travelled less than the straight-line distance, giving a ratio
   below 1. This is why the metrics table reports `ratio+` alongside `ratio`.
@@ -341,6 +434,98 @@ success anyway, so the failure was silent.
   are unaffected and the run simply takes longer. What breaks a run is the
   simulator falling behind unevenly, because the autopilot then decides its
   sensors are dead.
+
+## Stage 3: training and flying the policy
+
+Everything runs in the VM, from the repository root unless noted. Once:
+
+```bash
+bash rl/setup_env.sh
+```
+
+Then in every terminal that uses the policy:
+
+```bash
+source rl/env.sh
+```
+
+**Check the pieces** (both write their reports to `rl/logs/`):
+
+```bash
+python rl/test_lidar.py
+python rl/check_env.py
+```
+
+`check_env.py` ends with the straight-line comparison against the Gazebo
+sweep, which should agree on 25 of 25 scenarios for both flight models.
+
+**Train.** About 31 minutes for 2 million decisions on the VM with 4
+environments:
+
+```bash
+python rl/train.py --dynamics mujoco --steps 2000000 --name mujoco_1
+```
+
+The run directory `rl/runs/mujoco_1/` gets `best.zip` (the version with the
+most arrivals on 100 held-out mazes), the lidar and environment settings it was
+trained with, and the evaluation history in `eval.csv`.
+
+**Evaluate in MuJoCo through the deployment code:**
+
+```bash
+python rl/evaluate.py rl/runs/mujoco_1
+```
+
+It flies the 25 single-drone Gazebo scenarios straight and with the policy, and
+checks that the observation `policy.py` builds is the one the network was
+trained on (it should report a largest difference of 0).
+
+**Fly it in Gazebo.** The same as stage 2 with `--policy` added, from `px4/`
+(where the venv is `source ../rl/env.sh`):
+
+```bash
+./run_multi_mission.py --scenario scenarios3d/s21_n10_k3 --timeout 180 --policy ../rl/runs/mujoco_1
+```
+
+**The comparison sweep**, both arms, about 4 hours together:
+
+```bash
+./run_batch_3d.py --n 4 8 12 16 20 --k 1 2 3 --seeds 1 2 3 4 5 --timeout 180
+./run_batch_3d.py --n 4 8 12 16 20 --k 1 2 3 --seeds 1 2 3 4 5 --timeout 180 --policy ../rl/runs/mujoco_1
+python3 compare_sweeps_3d.py runs3d/<straight batch> runs3d/<policy batch>
+```
+
+The policy arm refuses to start if the venv is not active. To repeat the
+reported sweep with the same model, use
+`--policy ../results/2026-10-19_rl_sweep/model`, the copy of the model that was
+evaluated.
+
+### Notes on the RL stage
+
+- **Why train in MuJoCo.** One Gazebo flight takes about a minute of real
+  time, and the policy needs hundreds of thousands of decisions. The MuJoCo
+  environment runs about 900 decisions per second per environment, without
+  rendering, so the VM's missing GPU does not matter.
+- **Bug in MuJoCo-Drones-Gym (commit ca170dc).** Its waypoint action mode
+  creates a new position controller at every control step, so the controller
+  state is lost, the attitude oscillates with growing amplitude and the drone
+  flips. Hovering and climbing still work, which makes it easy to miss.
+  `rl/env.py` uses the package's RPM mode and calls its controller itself, one
+  instance per episode. `rl/diagnose_flight.py` reproduces the failure.
+- **Same speed in both simulators.** The direction is flown at 1.04 m/s level
+  and 1.17 m/s climbing, the speeds measured in MuJoCo for the waypoint
+  distance used in training, and `run_mission.py` sends the same speeds to PX4
+  as velocity setpoints.
+- **Training stability.** With a constant learning rate the policy peaked and
+  then got worse as its action noise shrank. A learning rate decaying to zero
+  and `target_kl` 0.03 keep it stable.
+- **PyTorch on ARM.** On ARM64 Linux a plain `pip install torch` picks the CUDA
+  build, about 9 GB of NVIDIA libraries that cannot be used in the VM.
+  `setup_env.sh` installs from the CPU-only index instead.
+- **Known limitation.** The policy was trained with one drone and static
+  obstacles. Other drones appear in its lidar only in Gazebo, which is one of
+  two possible reasons the crash rate rises at k = 3 (the other is that the
+  k = 3 mazes are a different set; see the results README).
 
 ## Stage 1: running Nav2 (step by step)
 
@@ -585,18 +770,14 @@ back in for static scenarios.
   200`). With the defaults, Nav2 aborted goals spuriously whenever the
   RAM-limited VM froze briefly and delayed its internal service calls.
 
-## Next steps
+## Status
 
-The Nav2 baseline is complete (static sweep and speed-degradation sweep, see
-`results/`), and the PX4 stage now flies k drones through 3D mazes and has its
-full (n, k) sweep (`results/2026-09-06_3d_sweep/`).
+All three stages are complete: the Nav2 baseline (static and moving obstacle
+sweeps), the PX4 baseline over (n, k) without avoidance
+(`results/2026-09-06_3d_sweep/`), and the RL policy compared against it on the
+same scenarios (`results/2026-10-19_rl_sweep/`).
 
-What remains is **the avoidance component**. PX4 provides no 3D avoidance, so
-everything measured so far is the "without avoidance" baseline. The thesis
-contribution is the component that closes that gap.
-
-The measurement side is already in place, so adding it means changing one
-thing: `run_mission.py` currently publishes a setpoint straight at the target,
-and that is the only place where a path is decided. The comparison would then
-use the same generator, the same seeds and the same metrics, so the two arms
-are directly comparable.
+Possible improvements to the policy, none of them done: training with several
+drones in the episode, a larger penalty for flying close to obstacles (to widen
+the margins of the drones it saves), and training at a higher speed (to shorten
+the missions).

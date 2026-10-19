@@ -80,9 +80,18 @@ def read_scalars(path):
     return values
 
 
+PX4_BUILD_DIR = Path.home() / "px4" / "PX4-Autopilot" / "build"
+
+
 def teardown():
     sh([str(STOP)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(5)
+    # PX4's own flight logs. start_px4_multi.sh switches them off, but an
+    # instance only reads that setting when it boots, so the first run of a
+    # sweep can still write some. Nothing here uses them, and left alone they
+    # would fill the disk over a long sweep.
+    for ulg in PX4_BUILD_DIR.rglob("*.ulg"):
+        ulg.unlink(missing_ok=True)
 
 
 def wait_for_ready(log_dir, k, timeout=120):
@@ -101,7 +110,7 @@ def wait_for_ready(log_dir, k, timeout=120):
     return False
 
 
-def run_one(n, k, seed, batch_dir, timeout, wall_timeout):
+def run_one(n, k, seed, batch_dir, timeout, wall_timeout, policy=None):
     run_dir = batch_dir / f"n{n}_k{k}_s{seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
     scenario = run_dir / "scenario"
@@ -150,7 +159,8 @@ def run_one(n, k, seed, batch_dir, timeout, wall_timeout):
 
     mission = sh([sys.executable, str(MULTI), "--scenario", str(scenario),
                   "--out", str(run_dir / "run"), "--timeout", str(timeout),
-                  "--wall-timeout", str(wall_timeout)],
+                  "--wall-timeout", str(wall_timeout),
+                  *(["--policy", str(policy)] if policy else [])],
                  capture_output=True, text=True)
     (run_dir / "multi_mission.log").write_text(
         mission.stdout + "\n" + mission.stderr)
@@ -194,13 +204,26 @@ def main():
                          "(default: 5 x --timeout). Raise it when the "
                          "simulation runs well below real time.")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--policy", type=Path, default=None,
+                    help="fly every drone with this trained policy "
+                         "(an rl/runs/<name> directory); default: straight. "
+                         "Needs the RL venv: source rl/env.sh")
     args = ap.parse_args()
 
+    if args.policy is not None:
+        args.policy = args.policy.expanduser().resolve()
+        try:
+            import stable_baselines3  # noqa: F401
+        except ImportError:
+            sys.exit("--policy needs the RL venv. Run  source rl/env.sh  first.")
+
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    batch_dir = (args.out or (HERE / "runs3d" / f"batch_{stamp}")).resolve()
+    label = "policy" if args.policy else "straight"
+    batch_dir = (args.out or (HERE / "runs3d" / f"batch_{stamp}_{label}")).resolve()
     batch_dir.mkdir(parents=True, exist_ok=True)
 
     total = len(args.n) * len(args.k) * len(args.seeds)
+    print(f"Flying: {'policy ' + str(args.policy) if args.policy else 'straight (no avoidance)'}")
     print(f"Sweep: n in {args.n}, k in {args.k}, seeds {args.seeds}")
     print(f"{total} runs -> {batch_dir}")
     print()
@@ -212,7 +235,8 @@ def main():
         for n in args.n:
             for k in args.k:
                 for seed in args.seeds:
-                    run_one(n, k, seed, batch_dir, args.timeout, wall_timeout)
+                    run_one(n, k, seed, batch_dir, args.timeout, wall_timeout,
+                            args.policy)
     except KeyboardInterrupt:
         print("\ninterrupted; cleaning up")
         teardown()

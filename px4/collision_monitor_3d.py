@@ -38,6 +38,8 @@ from geometry_msgs.msg import PointStamped, PoseStamped
 from std_msgs.msg import Bool
 from mavros_msgs.srv import CommandBool, CommandLong
 
+from mavros_ns import resolve as resolve_mavros
+
 # PX4 refuses a normal disarm while the vehicle is airborne ("Disarming
 # denied: not landed"). MAV_CMD_COMPONENT_ARM_DISARM with this magic value in
 # param2 forces it, which is what "destroyed" needs to mean here.
@@ -98,10 +100,10 @@ class CollisionMonitor3D(Node):
             depth=10,
         )
 
-        # MAVROS's own namespace, not a prefix added in front of one. Running
-        # mavros_node with __ns:=/uav0 replaces its default /mavros namespace,
-        # so the topics are /uav0/state rather than /uav0/mavros/state.
-        ns = mavros_ns.rstrip("/")
+        # Where MAVROS's topics live inside the drone's namespace depends on
+        # the MAVROS version (/uav0/... in 2.14, /uav0/mavros/... in 2.16),
+        # so it is looked up rather than assumed. See mavros_ns.py.
+        ns = resolve_mavros(self, mavros_ns)
         self.create_subscription(
             PoseStamped, f"{ns}/local_position/pose",
             self.pose_cb, sensor_qos)

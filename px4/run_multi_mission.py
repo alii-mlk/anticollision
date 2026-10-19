@@ -98,7 +98,22 @@ def main():
                          "only catches a simulation that has stopped.")
     ap.add_argument("--no-wait", action="store_true",
                     help="start even if the stack has not reported ready")
+    ap.add_argument("--policy", type=Path, default=None,
+                    help="fly every drone with this trained policy "
+                         "(an rl/runs/<name> directory); default: straight")
     args = ap.parse_args()
+
+    if args.policy is not None:
+        # The missions run with this same interpreter, so check here, once,
+        # rather than have every drone fail on its own.
+        try:
+            import stable_baselines3  # noqa: F401
+            import torch  # noqa: F401
+        except ImportError:
+            sys.exit("--policy needs the RL venv. Run  source rl/env.sh  first.")
+        args.policy = args.policy.expanduser().resolve()
+        if not args.policy.exists():
+            sys.exit(f"policy not found: {args.policy}")
 
     scenario = args.scenario.resolve()
     scenario_file = scenario / "scenario.yaml"
@@ -123,6 +138,7 @@ def main():
     print(f"Output:   {out_root}")
     print(f"Timeout:  {args.timeout:.0f} s simulated, "
           f"{wall_timeout:.0f} s wall clock")
+    print(f"Flying:   {'policy ' + str(args.policy) if args.policy else 'straight (no avoidance)'}")
     print()
 
     monitors, missions, out_dirs = [], [], []
@@ -152,6 +168,7 @@ def main():
 
     time.sleep(3)
 
+    policy_args = ["--policy", str(args.policy)] if args.policy else []
     for i in range(k):
         missions.append(subprocess.Popen(
             [sys.executable, str(MISSION),
@@ -160,7 +177,7 @@ def main():
              "--mavros-ns", f"/uav{i}",
              "--timeout", str(args.timeout),
              "--wall-timeout", str(wall_timeout),
-             "--out", str(out_dirs[i])],
+             "--out", str(out_dirs[i]), *policy_args],
             stdout=open(out_dirs[i] / "mission.log", "w"),
             stderr=subprocess.STDOUT))
         print(f"  mission {i} started")
@@ -211,6 +228,7 @@ def main():
             "travelled": float(mission.get("travelled_distance", 0.0)),
             "time": float(mission.get("simulation_time", 0.0)),
             "wall": float(mission.get("wall_time", 0.0)),
+            "cpu": float(mission.get("cpu_time", 0.0)),
             "destroyed": outcome.get("destroyed", "unknown") == "true",
             "min_clearance": outcome.get("min_clearance", "null"),
             "collided_with": outcome.get("collided_with", "-"),
@@ -241,6 +259,9 @@ def main():
     # factor the machine actually achieved, which is the number that says
     # whether this many drones can be simulated here at full speed.
     sim_time = max((r["time"] for r in rows), default=0.0)
+    # Processor time of the mission nodes themselves, i.e. the controller:
+    # negligible flying straight, the neural network's cost with the policy.
+    controller_cpu = sum(r["cpu"] for r in rows)
     slowest_wall = max((r["wall"] for r in rows), default=0.0)
     rtf = (sim_time / slowest_wall) if slowest_wall > 0 else 0.0
 
@@ -263,6 +284,8 @@ def main():
           f"real time factor {rtf:.2f}")
 
     (out_root / "summary.yaml").write_text(
+        f"controller: {'policy' if args.policy else 'straight'}\n"
+        f"policy: {args.policy or '-'}\n"
         f"k_drones: {len(rows)}\n"
         f"reached: {reached}\n"
         f"collisions: {collisions}\n"
@@ -275,6 +298,7 @@ def main():
         f"simulation_time: {sim_time:.2f}\n"
         f"real_time_factor: {rtf:.3f}\n"
         f"wall_time: {wall_time:.2f}\n"
+        f"controller_cpu_time: {controller_cpu:.2f}\n"
         "drones:\n" +
         "".join(
             f"  - {{id: {r['id']}, outcome: {r['outcome']}, "

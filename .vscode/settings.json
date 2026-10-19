@@ -10,8 +10,6 @@
         "activityBar.foreground": "#FFFFFF",
         "activityBar.inactiveForeground": "#FFFFFF",
         "statusBar.debuggingForeground": "#FFFFFF",
-        "statusBar.noFolderForeground": "#FFFFFF",
-        "statusBar.background": "#464114",
-        "statusBar.foreground": "#FFFFFF"
+        "statusBar.noFolderForeground": "#FFFFFF"
     }
 }

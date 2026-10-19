@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Fly a drone to its scenario target and record the result.
 
-This is the baseline mission: the drone flies straight at its target using
-offboard position setpoints, with no avoidance. Obstacles are in its way, so
-this run is expected to collide in a dense maze. It provides the "without
-avoidance" numbers the avoidance component is later compared against.
+Two ways to fly. Apart from the steering they run through the same code, so
+the two can be compared directly:
+
+  default     the baseline: straight at the target with offboard position
+              setpoints, no avoidance. Expected to collide in a dense maze.
+  --policy    the trained avoidance policy (rl/policy.py). After the same
+              climb to take-off altitude, about ten times a second it builds
+              the policy's observation from the scenario's boxes, the other
+              drones' positions and its own state, and flies the chosen
+              direction as an offboard velocity setpoint at the speeds the
+              policy trained under. Needs the RL venv: source rl/env.sh.
 
 The run ends when the drone reaches its target, is destroyed by
 collision_monitor_3d.py (which disarms it), or the timeout expires.
@@ -34,6 +41,7 @@ Euclidean distance.
 Usage:
   ./run_mission.py --scenario scenarios3d/s1_n8_k1
   ./run_mission.py --scenario <dir> --out runs/r1 --timeout 180
+  python run_mission.py --scenario <dir> --policy ../rl/runs/mujoco_1
 """
 
 import argparse
@@ -47,11 +55,13 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, TwistStamped
 from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Bool
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, SetMode
+
+from mavros_ns import resolve as resolve_mavros
 
 SETPOINT_RATE_HZ = 20.0
 PRESTREAM_SETPOINTS = 40      # ~2 s of setpoints before requesting OFFBOARD
@@ -91,6 +101,33 @@ REQUEST_INTERVAL_S = 1.0
 # arrive.
 ARM_DEADLINE_S = 60.0
 
+# A mission only starts from a drone that is disarmed and on the ground at its
+# start point. When a mission ends, PX4 returns home on its own: it climbs to
+# about 30 m and lands, which takes a minute or so. A second mission started on
+# the same stack in that time took off from up to 28 m in the air, counted the
+# whole descent as travelled distance (ratio 1.89 instead of about 1.05), and
+# handed the policy an unusual starting state, without any error. Restarting
+# the stack (start_px4_multi.sh) puts every drone back on the ground at its
+# start. The batch sweep does this for every run.
+START_MAX_HEIGHT = 0.5
+START_MAX_OFFSET = 1.0
+
+RL_DIR =Path(__file__).resolve().parent.parent / "rl"
+
+
+def load_policy(path):
+    """The trained policy and the obstacle boxes, only when --policy is used.
+
+    Imported here rather than at the top so the baseline still runs from the
+    plain system Python, without the RL venv.
+    """
+    sys.path.insert(0, str(RL_DIR))
+    try:
+        from policy import AvoidancePolicy
+    except ImportError as exc:
+        sys.exit(f"--policy needs the RL venv ({exc}). Run  source rl/env.sh  first.")
+    return AvoidancePolicy(path)
+
 
 def parse_scenario(path):
     text = path.read_text()
@@ -105,11 +142,14 @@ def parse_scenario(path):
 
 class MissionRunner(Node):
     def __init__(self, start, target, tolerance, timeout, wall_timeout,
-                 out_dir, mavros_ns, drone_id):
+                 out_dir, mavros_ns, drone_id, n_drones=1, policy=None,
+                 boxes=None):
         super().__init__("run_mission")
 
         self.start = start
         self.target_world = target
+        self.policy = policy
+        self.boxes = boxes
         # PX4's local frame originates at the spawn point.
         self.target_local = tuple(t - s for t, s in zip(target, start))
         self.tolerance = tolerance
@@ -124,10 +164,10 @@ class MissionRunner(Node):
             depth=10,
         )
 
-        # MAVROS's own namespace, not a prefix added in front of one. Running
-        # mavros_node with __ns:=/uav0 replaces its default /mavros namespace,
-        # so the topics are /uav0/state rather than /uav0/mavros/state.
-        ns = mavros_ns.rstrip("/")
+        # Where MAVROS's topics live inside the drone's namespace depends on
+        # the MAVROS version (/uav0/state in 2.14, /uav0/mavros/state in
+        # 2.16), so it is looked up rather than assumed. See mavros_ns.py.
+        ns = resolve_mavros(self, mavros_ns)
         self.state = State()
         self.local_pos = None
 
@@ -154,6 +194,28 @@ class MissionRunner(Node):
         self.arming_client = self.create_client(CommandBool, f"{ns}/cmd/arming")
         self.mode_client = self.create_client(SetMode, f"{ns}/set_mode")
 
+        # Only the policy needs these: its own velocity, which is part of the
+        # observation, the other drones' positions, which go into its lidar,
+        # and a velocity setpoint to fly what it chooses.
+        self.vel = (0.0, 0.0, 0.0)
+        self.others = {}
+        self.decisions = 0
+        self.last_decision = None
+        self.velocity_cmd = (0.0, 0.0, 0.0)
+        if self.policy is not None:
+            # MAVROS reports this in the local frame, whose axes are the
+            # world's, so it is already the world-frame velocity.
+            self.create_subscription(TwistStamped, f"{ns}/local_position/velocity_local",
+                                     self.velocity_cb, sensor_qos)
+            for other in range(n_drones):
+                if other != drone_id:
+                    self.create_subscription(
+                        PointStamped, f"/drone_world_position/drone{other}",
+                        self.make_other_cb(other), 10)
+            self.velocity_pub = self.create_publisher(
+                TwistStamped, f"{ns}/setpoint_velocity/cmd_vel", 10)
+            self.get_logger().info(f"Flying with policy {self.policy.describe()}")
+
         self.sent = 0
         self.elapsed = 0.0        # simulated seconds since the run started
         self.sim_now = None       # latest /clock reading, seconds
@@ -161,6 +223,7 @@ class MissionRunner(Node):
         self.wall_start = time.monotonic()
         self.wall_elapsed = 0.0
         self.last_request = -REQUEST_INTERVAL_S
+        self.start_checked = False
         self.climbed = False
         self.outcome = None
         self.was_armed = False
@@ -174,6 +237,11 @@ class MissionRunner(Node):
         self.raw_world = None     # latest raw position, used for reporting
 
         self.euclidean = math.dist(start, target)
+        # This node's own processor time for the flight, loading excluded. The
+        # sweep's cpu_time is sampled from the simulator processes after the
+        # flight, when this node has already exited, so without this the
+        # network's cost would not be measured anywhere.
+        self.cpu_start = time.process_time()
         self.timer = self.create_timer(1.0 / SETPOINT_RATE_HZ, self.tick)
 
         self.get_logger().info(
@@ -194,6 +262,36 @@ class MissionRunner(Node):
 
     def clock_cb(self, msg):
         self.sim_now = msg.clock.sec + msg.clock.nanosec * 1e-9
+
+    def velocity_cb(self, msg):
+        v = msg.twist.linear
+        self.vel = (v.x, v.y, v.z)
+
+    def make_other_cb(self, other_id):
+        # The monitors keep publishing a destroyed drone's last position, so a
+        # wreck stays in the lidar as an obstacle.
+        def cb(msg):
+            self.others[other_id] = (msg.point.x, msg.point.y, msg.point.z)
+        return cb
+
+    def make_velocity(self, xyz):
+        cmd = TwistStamped()
+        cmd.header.stamp = self.get_clock().now().to_msg()
+        cmd.header.frame_id = "map"
+        cmd.twist.linear.x, cmd.twist.linear.y, cmd.twist.linear.z = xyz
+        return cmd
+
+    def steer(self):
+        """Ask the policy where to go, at the rate it was trained to decide."""
+        if (self.last_decision is not None
+                and self.elapsed - self.last_decision < self.policy.decision_dt):
+            return
+        self.last_decision = self.elapsed
+        world = tuple(p + s for p, s in zip(self.local_pos, self.start))
+        obs = self.policy.observe(world, self.vel, self.target_world, self.boxes,
+                                  list(self.others.values()))
+        self.velocity_cmd = tuple(self.policy.velocity(self.policy.action(obs)))
+        self.decisions += 1
 
     def advance_time(self):
         """Update elapsed simulated time and elapsed wall-clock time."""
@@ -262,8 +360,27 @@ class MissionRunner(Node):
             self.finish("destroyed")
             return
 
-        self.setpoint_pub.publish(self.make_setpoint(setpoint))
+        # Once the policy has taken over it sends velocities only. Sending a
+        # position setpoint as well would have PX4 alternate between the two.
+        if self.policy is not None and self.climbed and self.local_pos is not None:
+            self.steer()
+            self.velocity_pub.publish(self.make_velocity(self.velocity_cmd))
+        else:
+            self.setpoint_pub.publish(self.make_setpoint(setpoint))
         self.sent += 1
+
+        if not self.start_checked and self.local_pos is not None:
+            self.start_checked = True
+            x, y, z = self.local_pos
+            if (z > START_MAX_HEIGHT or math.hypot(x, y) > START_MAX_OFFSET
+                    or self.state.armed):
+                self.get_logger().error(
+                    f"The drone is not resting at its start point "
+                    f"(local position ({x:.1f}, {y:.1f}, {z:.1f}), "
+                    f"armed={self.state.armed}). A previous flight's return "
+                    f"to home is probably still running. Restart the stack "
+                    f"with start_px4_multi.sh before flying again.")
+                self.finish("not_at_start")
 
         if self.sent < PRESTREAM_SETPOINTS:
             return
@@ -309,11 +426,16 @@ class MissionRunner(Node):
         dist = math.dist(self.local_pos, self.target_local)
         if self.sent % 40 == 0:
             w = self.raw_world or (0, 0, 0)
+            steering = ""
+            if self.policy is not None:
+                c, v = self.velocity_cmd, self.vel
+                steering = (f" cmd=({c[0]:.2f}, {c[1]:.2f}, {c[2]:.2f}) "
+                            f"speed={math.hypot(*v):.2f} m/s decisions={self.decisions}")
             self.get_logger().info(
                 f"mode={self.state.mode} armed={self.state.armed} "
                 f"world=({w[0]:.1f}, {w[1]:.1f}, {w[2]:.1f}) "
                 f"dist={dist:.2f} m travelled={self.travelled:.1f} m "
-                f"sim={self.elapsed:.0f} s rtf={self.real_time_factor:.2f}"
+                f"sim={self.elapsed:.0f} s rtf={self.real_time_factor:.2f}{steering}"
             )
 
         if dist <= self.tolerance:
@@ -379,8 +501,14 @@ class MissionRunner(Node):
     def write_results(self):
         ratio = self.travelled / self.euclidean if self.euclidean > 0 else 0.0
         w = self.raw_world or (0.0, 0.0, 0.0)
+        controller = "straight" if self.policy is None else "policy"
+        policy_file = "-" if self.policy is None else str(self.policy.model_file)
         (self.out_dir / "mission.yaml").write_text(
             f"outcome: {self.outcome}\n"
+            f"controller: {controller}\n"
+            f"policy: {policy_file}\n"
+            f"policy_decisions: {self.decisions}\n"
+            f"cpu_time: {time.process_time() - self.cpu_start:.2f}\n"
             f"euclidean_distance: {self.euclidean:.3f}\n"
             f"travelled_distance: {self.travelled:.3f}\n"
             f"ratio: {ratio:.3f}\n"
@@ -414,6 +542,9 @@ def main():
                     help="MAVROS namespace: /mavros for a single drone, "
                          "/uav0, /uav1, ... for multi-drone runs")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--policy", type=Path, default=None,
+                    help="fly with a trained policy: an rl/runs/<name> directory "
+                         "(uses its best.zip) or a model .zip inside one")
     args = ap.parse_args()
 
     scenario_file = args.scenario / "scenario.yaml"
@@ -429,10 +560,17 @@ def main():
     wall_timeout = (args.wall_timeout
                     or args.timeout * DEFAULT_WALL_TIMEOUT_FACTOR)
 
+    policy = boxes = None
+    if args.policy is not None:
+        policy = load_policy(args.policy)
+        from lidar import boxes_from_scenario
+        boxes = boxes_from_scenario(scenario_file)
+
     rclpy.init()
     node = MissionRunner(d["start"], d["target"], args.tolerance,
                          args.timeout, wall_timeout, out_dir,
-                         args.mavros_ns, args.drone_id)
+                         args.mavros_ns, args.drone_id, n_drones=len(drones),
+                         policy=policy, boxes=boxes)
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, SystemExit):

@@ -1,0 +1,64 @@
+{
+  "dynamics": "mujoco",
+  "steps": 2000000,
+  "envs": 4,
+  "n_obstacles": [
+    0,
+    20
+  ],
+  "seed": 0,
+  "ppo": {
+    "n_steps": 1024,
+    "batch_size": 256,
+    "n_epochs": 10,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "ent_coef": 0.0,
+    "target_kl": 0.03,
+    "learning_rate": 0.0003,
+    "lr_schedule": "linear to 0"
+  },
+  "policy": {
+    "net_arch": [
+      256,
+      256
+    ]
+  },
+  "env": {
+    "TAKEOFF_ALTITUDE": 3.0,
+    "DRONE_RADIUS": 0.35,
+    "TOLERANCE": 0.6,
+    "CEILING": 12.0,
+    "OUT_MARGIN": 3.0,
+    "SIM_FREQ": 240,
+    "CTRL_FREQ": 48,
+    "DECISION_EVERY": 5,
+    "SETTLE_STEPS": 48,
+    "MAX_DECISIONS": 600,
+    "LOOKAHEAD": 2.5,
+    "POINT_SPEED": 1.05,
+    "POINT_LAG": 0.3,
+    "V_SCALE": 3.0,
+    "DIST_SCALE": 30.0,
+    "PROGRESS": 1.0,
+    "TIME_COST": 0.01,
+    "SAFE_DISTANCE": 1.0,
+    "NEAR_COST": 0.1,
+    "CRASH_COST": 10.0,
+    "ARRIVAL_BONUS": 10.0
+  },
+  "lidar": {
+    "n_azimuth": 16,
+    "elevations_deg": [
+      -60.0,
+      -30.0,
+      0.0,
+      30.0,
+      60.0
+    ],
+    "poles": true,
+    "max_range": 10.0,
+    "ground": true
+  }
+}

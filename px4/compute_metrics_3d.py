@@ -11,6 +11,8 @@ Reads every run directory produced by run_batch_3d.py and reports, for each
   ratio+            the same, over only the drones that reached their target
   sim time          simulation time of the run
   cpu time          processor time used by the simulator and autopilots
+  ctrl              processor time of the mission nodes, i.e. the controller:
+                    next to nothing flying straight, the network with a policy
 
 Values are averaged over the seeds of a configuration.
 
@@ -79,6 +81,7 @@ def collect(batch_dir):
             "sim_time": to_float(summary.get("simulation_time")),
             "real_time_factor": to_float(summary.get("real_time_factor")),
             "cpu_time": to_float(summary.get("cpu_time")),
+            "controller_cpu_time": to_float(summary.get("controller_cpu_time")),
             "wall_time": to_float(summary.get("wall_time")),
         })
     return rows
@@ -97,7 +100,7 @@ def summarize(rows):
     header = (f"{'n':>3} {'k':>3} {'runs':>5} {'reached':>9} {'coll':>5} "
               f"{'(obst/drone)':>13} {'euclid(m)':>10} {'travel(m)':>10} "
               f"{'ratio':>7} {'ratio+':>7} {'sim(s)':>8} {'wall(s)':>8} "
-              f"{'rtf':>6} {'cpu(s)':>8}")
+              f"{'rtf':>6} {'cpu(s)':>8} {'ctrl(s)':>8}")
     lines = [header, "-" * len(header)]
 
     for (n, k) in sorted(groups):
@@ -128,7 +131,8 @@ def summarize(rows):
             f"{mean([r['sim_time'] for r in ok]):>8.1f} "
             f"{mean([r['wall_time'] for r in ok]):>8.1f} "
             f"{mean([r['real_time_factor'] for r in ok]):>6.2f} "
-            f"{mean([r['cpu_time'] for r in ok]):>8.0f}")
+            f"{mean([r['cpu_time'] for r in ok]):>8.0f} "
+            f"{mean([r['controller_cpu_time'] for r in ok]):>8.1f}")
     return "\n".join(lines)
 
 
