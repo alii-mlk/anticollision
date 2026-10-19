@@ -65,7 +65,7 @@ the summed Euclidean distance is identical down each k column (21.5, 37.6 and
 53.3 m for k = 1, 2, 3). Obstacle density is varied against a fixed set of
 flights.
 
-## Stage 3: avoidance with reinforcement learning (complete)
+## Stage 3: avoidance with reinforcement learning
 
 A neural network decides which way each drone flies. Its input is a 3D lidar
 scan plus the target, and its output is a direction. It is trained with PPO
@@ -772,10 +772,10 @@ back in for static scenarios.
 
 ## Status
 
-All three stages are complete: the Nav2 baseline (static and moving obstacle
-sweeps), the PX4 baseline over (n, k) without avoidance
-(`results/2026-09-06_3d_sweep/`), and the RL policy compared against it on the
-same scenarios (`results/2026-10-19_rl_sweep/`).
+Done so far: the Nav2 baseline (static and moving obstacle sweeps), the PX4
+baseline over (n, k) without avoidance (`results/2026-09-06_3d_sweep/`), and
+the RL policy compared against it on the same scenarios
+(`results/2026-10-19_rl_sweep/`).
 
 Possible improvements to the policy, none of them done: training with several
 drones in the episode, a larger penalty for flying close to obstacles (to widen
