@@ -1,0 +1,13 @@
+decisions,policy,1 drone,3 drones,8 drones
+0.4 M,checkpoint,31/40,51/60,71/80
+0.8 M,checkpoint,36/40,51/60,71/80
+1.2 M,checkpoint,38/40,53/60,71/80
+1.6 M,checkpoint,38/40,54/60,78/80
+2.0 M,checkpoint,40/40,57/60,74/80
+2.4 M,checkpoint,40/40,57/60,73/80
+2.8 M,checkpoint,35/40,56/60,79/80
+3.2 M,checkpoint,36/40,55/60,78/80
+3.6 M,checkpoint,37/40,56/60,79/80
+4.0 M,checkpoint,39/40,57/60,77/80
+4.0 M,final.zip,39/40,57/60,78/80
+-,flying straight,19/40,26/60,50/80

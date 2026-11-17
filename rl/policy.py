@@ -17,16 +17,18 @@ trained policy sees. The network's input size is checked against the lidar
 before anything flies.
 
 Why velocities: in training the waypoint is recomputed LOOKAHEAD metres ahead
-at every control step, so what the drone actually follows is a commanded
+at every control step, so what the drone follows is a commanded
 velocity, measured at FLOWN_SPEED_XY level and FLOWN_SPEED_Z climbing for a
 full-length action. Sending PX4 the same speeds reproduces the flight the
 policy trained on, without depending on how PX4's position controller is
 tuned.
 
-Other drones are added to the lidar as cubes of side 2 * DRONE_RADIUS, so the
-drone keeps the same clearance from them that it learned to keep from boxes.
-Note that the policy was trained with one drone, so it has only ever seen
-obstacles that stand still.
+Other drones are added to the lidar as cubes of side 2 * DRONE_RADIUS. A
+policy trained with neighbours (config.json says how many) is also given the
+relative position and velocity of its nearest flying neighbours, built by
+env.neighbour_features as in training. The first policies were trained with
+one drone and the lidar only, and have neither seen moving obstacles nor
+those inputs.
 """
 
 import json
@@ -53,8 +55,8 @@ class AvoidancePolicy:
 
         import torch
         # Several drones each run their own copy, next to PX4 and Gazebo. One
-        # thread each is plenty for a network this small and keeps them from
-        # fighting the simulator for cores.
+        # thread each is enough for a network this small and leaves the other
+        # cores to the simulator.
         torch.set_num_threads(threads)
         from stable_baselines3 import PPO
 
@@ -85,19 +87,48 @@ class AvoidancePolicy:
         self.speed_xy = setting("FLOWN_SPEED_XY")
         self.speed_z = setting("FLOWN_SPEED_Z")
 
-        expected = int(self.model.observation_space.shape[0])
-        if expected != self.lidar.n_rays + 8:
-            raise ValueError(
-                f"the network takes {expected} inputs, but lidar.json gives "
-                f"{self.lidar.n_rays} rays + 8 = {self.lidar.n_rays + 8}")
+        # How many nearest drones the policy is told about, and with what
+        # scales. Zero for policies trained with the lidar only.
+        self.neighbours = int(config.get("neighbours") or 0)
+        self.neighbour_range = setting("NEIGHBOUR_RANGE")
+        self.neighbour_miss_range = setting("NEIGHBOUR_MISS_RANGE")
+        self.neighbour_horizon = setting("NEIGHBOUR_HORIZON")
 
-    def observe(self, pos, vel, target, boxes, others=()):
+        expected = int(self.model.observation_space.shape[0])
+        built = self.lidar.n_rays + 8 + self.neighbours * maze.NEIGHBOUR_FEATURES
+        if expected != built:
+            raise ValueError(
+                f"the network takes {expected} inputs, but lidar.json and "
+                f"config.json give {self.lidar.n_rays} rays + 8 + "
+                f"{self.neighbours} neighbours x {maze.NEIGHBOUR_FEATURES} = {built}")
+
+    def observe(self, pos, vel, target, boxes, others=(), neighbours=None,
+                neighbour_velocities=None):
+        """The network's input for one drone.
+
+        others: positions of everything drone-sized that the lidar should
+        see, wrecks included. neighbours and neighbour_velocities: the drones
+        that are flying, for the extra inputs of a policy trained with
+        neighbours; by default the same drones as others, taken as standing
+        still.
+        """
         boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 6)
         others = np.asarray(others, dtype=np.float64).reshape(-1, 3)
         if len(others):
             boxes = np.vstack([boxes, drone_boxes(others, self.radius)])
-        return maze.build_observation(self.lidar, pos, vel, target, boxes,
-                                      self.v_scale, self.dist_scale, self.ceiling)
+        obs = maze.build_observation(self.lidar, pos, vel, target, boxes,
+                                     self.v_scale, self.dist_scale, self.ceiling)
+        if not self.neighbours:
+            return obs
+        if neighbours is None:
+            neighbours = others
+        neighbours = np.asarray(neighbours, dtype=np.float64).reshape(-1, 3)
+        if neighbour_velocities is None:
+            neighbour_velocities = np.zeros_like(neighbours)
+        return np.concatenate([obs, maze.neighbour_features(
+            pos, vel, neighbours, neighbour_velocities, self.neighbours,
+            self.neighbour_range, self.neighbour_miss_range,
+            self.neighbour_horizon, self.v_scale)])
 
     def action(self, obs):
         a, _ = self.model.predict(obs, deterministic=True)
@@ -109,5 +140,6 @@ class AvoidancePolicy:
 
     def describe(self):
         return (f"{self.model_file} ({self.dynamics}), {self.lidar.n_rays} rays, "
+                f"{self.neighbours} neighbours, "
                 f"decision every {self.decision_dt:.3f} s, "
                 f"{self.speed_xy:.2f} m/s level, {self.speed_z:.2f} m/s climb")

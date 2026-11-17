@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Measure how fast the running Gazebo simulation is actually going.
+"""Measure how fast the running Gazebo simulation is going.
 
 The real time factor is how many seconds of simulated time the machine
 produces per second of wall-clock time. At 1.0 the simulation keeps up with
-reality. Below that it is running in slow motion, which is not by itself a
-problem: the physics is unchanged and simulated time is still the honest
-measure of a flight. It only becomes a problem when the autopilot does not
-know about it, because a flight controller expecting sensor data every few
-milliseconds of ITS clock will declare the sensors dead.
+reality. Below that it runs in slow motion, which on its own is fine: the
+physics is the same and simulated time still measures the flight correctly.
+It becomes a problem when the autopilot does not know about it, because a
+flight controller that expects sensor data every few milliseconds of its own
+clock then declares the sensors dead.
 
 This is the measurement to take first when drones fall out of the sky without
 touching anything, and after every change to the number of drones.

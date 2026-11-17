@@ -50,7 +50,7 @@ def say(text=""):
 def check(name, fn):
     """Run one check, record PASS or FAIL, and keep going either way."""
     say(f"--- {name} ---")
-    start = time.time()
+    start = time.monotonic()
     try:
         detail = fn()
         status = "PASS"
@@ -61,7 +61,7 @@ def check(name, fn):
         for line in tb[-8:]:
             say(f"    {line}")
         status = "FAIL"
-    took = time.time() - start
+    took = time.monotonic() - start
     say(f"{status}  {name}  ({took:.1f} s)  {detail or ''}")
     say()
     results.append((name, status, detail))
@@ -111,10 +111,10 @@ def check_mujoco():
         raise RuntimeError(f"fell {drop:.2f} m in 0.5 s, expected about 1.23 m")
 
     n = 20000
-    start = time.time()
+    start = time.monotonic()
     for _ in range(n):
         mujoco.mj_step(model, data)
-    rate = n / (time.time() - start)
+    rate = n / (time.monotonic() - start)
     np.asarray(data.qpos)
     return f"fell {drop:.2f} m in 0.5 s as expected; {rate:,.0f} raw physics steps/s"
 
@@ -141,14 +141,14 @@ def check_package():
     env, kwargs, params = make_package_env()
     obs, _ = env.reset(seed=0)
     n = 300
-    start = time.time()
+    start = time.monotonic()
     steps = 0
     for _ in range(n):
         obs, reward, terminated, truncated, _ = env.step(env.action_space.sample())
         steps += 1
         if terminated or truncated:
             obs, _ = env.reset()
-    rate = steps / (time.time() - start)
+    rate = steps / (time.monotonic() - start)
     env.close()
     shape = getattr(obs, "shape", type(obs).__name__)
     say(f"    constructor arguments: {', '.join(p for p in params if p != 'self')}")
@@ -184,9 +184,9 @@ def check_sb3(use_package):
 
     model = PPO("MlpPolicy", env, n_steps=256, batch_size=64, n_epochs=2,
                 verbose=0, device="cpu")
-    start = time.time()
+    start = time.monotonic()
     model.learn(total_timesteps=1024)
-    took = time.time() - start
+    took = time.monotonic() - start
     env.close()
     return f"PPO trained 1024 steps on {label} in {took:.1f} s ({1024 / took:,.0f} steps/s)"
 

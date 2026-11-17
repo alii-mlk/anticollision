@@ -1,0 +1,5 @@
+controller,drones,flights,arrived in MuJoCo,arrived in Gazebo
+straight,1,25,10,10
+straight,3,75,39,38
+final policy,1,25,25,25
+final policy,3,75,70,72

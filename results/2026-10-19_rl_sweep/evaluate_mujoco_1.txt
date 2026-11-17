@@ -1,0 +1,38 @@
+evaluation 2026-10-19 10:31:29
+policy  /mnt/hgfs/thesis/anticollision/rl/runs/mujoco_1/best.zip (mujoco), 82 rays, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+flown in the mujoco model
+
+scenario     gazebo    straight       policy          closest   ratio  highest
+n4  seed 1   reached   reached        reached           1.96m   1.003     4.7m
+n4  seed 2   crashed   collided       collided         -0.01m     nan     7.3m
+n4  seed 3   reached   reached        reached           2.65m   1.044     6.7m
+n4  seed 4   crashed   collided       reached           0.14m   1.128     6.2m
+n4  seed 5   reached   reached        reached           2.65m   1.038     4.6m
+n8  seed 1   reached   reached        reached           1.95m   1.005     4.7m
+n8  seed 2   crashed   collided       reached           0.38m   1.111     8.8m
+n8  seed 3   reached   reached        reached           2.65m   1.048     6.7m
+n8  seed 4   crashed   collided       reached           1.34m   1.119     6.2m
+n8  seed 5   reached   reached        reached           2.34m   1.047     4.6m
+n12 seed 1   reached   reached        reached           1.32m   1.001     5.5m
+n12 seed 2   crashed   collided       reached           0.26m   1.115     8.8m
+n12 seed 3   crashed   collided       reached           1.19m   1.174     6.9m
+n12 seed 4   crashed   collided       reached           1.96m   1.116     6.3m
+n12 seed 5   reached   reached        reached           2.34m   1.046     4.6m
+n16 seed 1   reached   reached        reached           1.59m   1.014     5.6m
+n16 seed 2   crashed   collided       reached           0.31m   1.124     9.1m
+n16 seed 3   crashed   collided       reached           0.11m   1.196     7.4m
+n16 seed 4   crashed   collided       reached           1.92m   1.105     6.3m
+n16 seed 5   crashed   collided       reached           0.05m   1.063     5.3m
+n20 seed 1   reached   reached        reached           1.37m   1.022     5.7m
+n20 seed 2   crashed   collided       reached           0.32m   1.143     9.0m
+n20 seed 3   crashed   collided       reached           0.94m   1.184     6.9m
+n20 seed 4   crashed   collided       collided         -0.00m     nan     6.2m
+n20 seed 5   crashed   collided       reached           0.90m   1.123     6.3m
+
+straight: {'reached': 10, 'collided': 15}
+policy:   {'reached': 23, 'collided': 2}
+saved by the policy (straight crashes, policy arrives): n4 s4, n8 s2, n8 s4, n12 s2, n12 s3, n12 s4, n16 s2, n16 s3, n16 s4, n16 s5, n20 s2, n20 s3, n20 s5
+lost by the policy (straight arrives, policy does not): none
+
+deployment observation vs training observation, over 5081 decisions: largest difference 0.00e+00
+PASS  the wrapper builds exactly what the policy was trained on

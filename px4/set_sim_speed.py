@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Set the speed Gazebo aims to run PX4's SITL world at.
 
-Why this exists. A machine that cannot simulate k drones at full speed does
-not fail gracefully: Gazebo falls behind by an amount that varies from moment
+A machine that cannot simulate k drones at full speed does not just run
+slower: Gazebo falls behind by an amount that varies from moment
 to moment, sensor messages arrive late and unevenly, and PX4 reports
 `Accel #0 fail: TIMEOUT`, loses its attitude estimate and drops the drone out
 of the sky. The flight fails for reasons that have nothing to do with
-navigation, which makes the run worthless.
+navigation, and the run is useless.
 
-Telling Gazebo to target a speed it can actually sustain replaces that with an
-evenly slowed simulation. The physics is identical, every drone experiences
-the same clock, and the run simply takes longer in wall-clock time. Simulated
+Telling Gazebo to aim for a speed the machine can hold gives an evenly slowed
+simulation instead. The physics is the same, every drone has the same clock,
+and the run only takes longer in wall-clock time. Simulated
 time, distances, collisions and their ratio are all unaffected, so the results
 mean the same thing they would on a faster machine.
 

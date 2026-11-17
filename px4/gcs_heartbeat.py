@@ -73,8 +73,8 @@ def send_heartbeat(conn):
 
 def await_param(conn, name, timeout):
     """Wait for the autopilot's report of one named parameter."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         msg = conn.recv_match(type="PARAM_VALUE", blocking=True, timeout=0.5)
         if msg is not None and msg.param_id.strip("\x00") == name:
             return msg
@@ -156,8 +156,8 @@ def main():
         if args.settings:
             # PX4 only starts talking once it has heard from us, and its
             # heartbeat is what tells us which system to address.
-            deadline = time.time() + 120.0
-            while conn.target_system == 0 and time.time() < deadline:
+            deadline = time.monotonic() + 120.0
+            while conn.target_system == 0 and time.monotonic() < deadline:
                 send_heartbeat(conn)
                 conn.recv_match(type="HEARTBEAT", blocking=True, timeout=1.0)
 

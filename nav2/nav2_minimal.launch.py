@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal Nav2 bringup for the drone world.
 
-Launches only the nodes this project actually uses:
+Launches only the nodes this project uses:
 controller_server, planner_server, behavior_server, bt_navigator,
 plus a lifecycle manager. Avoids the extra servers in the stock
 nav2_bringup navigation_launch.py (collision_monitor, route_server,

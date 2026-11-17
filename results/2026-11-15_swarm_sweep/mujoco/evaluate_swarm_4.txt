@@ -1,0 +1,39 @@
+evaluation 2026-11-15 18:13:07
+policy  /mnt/hgfs/thesis/anticollision/rl/runs/swarm_4/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+flown in the mujoco model
+
+scenario     gazebo    straight       policy          closest   ratio  highest
+n4  seed 1   reached   reached        reached           2.65m   1.036     6.6m
+n4  seed 2   crashed   collided       reached           0.62m   1.037     9.5m
+n4  seed 3   reached   reached        reached           2.65m   1.054     7.2m
+n4  seed 4   crashed   collided       reached           2.10m   1.158     6.5m
+n4  seed 5   reached   reached        reached           2.65m   1.058     6.6m
+n8  seed 1   reached   reached        reached           2.65m   1.048     7.2m
+n8  seed 2   crashed   collided       reached           1.20m   1.120    10.0m
+n8  seed 3   reached   reached        reached           2.65m   1.056     7.2m
+n8  seed 4   crashed   collided       reached           1.60m   1.130     6.5m
+n8  seed 5   reached   reached        reached           2.34m   1.058     6.6m
+n12 seed 1   reached   reached        reached           1.37m   1.098     8.1m
+n12 seed 2   crashed   collided       reached           1.20m   1.124    10.3m
+n12 seed 3   crashed   collided       reached           0.96m   1.160     7.7m
+n12 seed 4   crashed   collided       reached           1.48m   1.125     6.5m
+n12 seed 5   reached   reached        reached           2.34m   1.058     6.6m
+n16 seed 1   reached   reached        reached           1.39m   1.102     8.2m
+n16 seed 2   crashed   collided       reached           1.20m   1.141    10.3m
+n16 seed 3   crashed   collided       reached           0.56m   1.329     9.7m
+n16 seed 4   crashed   collided       reached           1.48m   1.123     6.5m
+n16 seed 5   crashed   collided       reached           1.79m   1.093     7.5m
+n20 seed 1   reached   reached        reached           1.41m   1.115     8.4m
+n20 seed 2   crashed   collided       reached           1.21m   1.144    10.5m
+n20 seed 3   crashed   collided       reached           0.51m   1.180     7.7m
+n20 seed 4   crashed   collided       reached           0.68m   1.287     9.5m
+n20 seed 5   crashed   collided       reached           1.30m   1.170     8.7m
+
+straight: {'reached': 10, 'collided': 15}
+policy:   {'reached': 25}
+saved by the policy (straight crashes, policy arrives): n4 s2, n4 s4, n8 s2, n8 s4, n12 s2, n12 s3, n12 s4, n16 s2, n16 s3, n16 s4, n16 s5, n20 s2, n20 s3, n20 s4, n20 s5
+lost by the policy (straight arrives, policy does not): none
+
+deployment observation vs training observation, over 5334 decisions: largest difference 0.00e+00
+the same with four drones per maze ({'reached': 20}), over 3654 decisions: largest difference 0.00e+00
+PASS  the wrapper builds the same observation as training

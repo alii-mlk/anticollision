@@ -44,8 +44,13 @@ Observation (90 values, all in [-1, 1]):
   86-88  velocity / 3 m/s, clipped
   89     altitude / ceiling
 
-Training uses one drone. Other drones only appear in Gazebo, where rl/policy.py
-adds them to the lidar.
+A policy trained with neighbours=K gets 10 more values for each of the K
+nearest other drones, see neighbour_features(). With one drone they are all
+zero.
+
+This file has one drone per maze. rl/swarm.py puts several drones in the same
+maze, with the same flight models, observation and reward, and adds the other
+drones to the lidar the way rl/policy.py does in Gazebo.
 """
 
 import math
@@ -91,7 +96,7 @@ MAX_DECISIONS = 600       # about a minute of flight
 LOOKAHEAD = 2.5
 POINT_SPEED = 1.05        # point model speed for a full-length action (m/s)
 
-# What a full-length action actually does in MuJoCo with that waypoint, measured
+# What a full-length action does in MuJoCo with that waypoint, measured
 # by check_env.py's calibration: 1.04 m/s level, 1.17 m/s climbing. The policy
 # learned under these speeds, so they are what PX4 is asked to fly in Gazebo,
 # as velocity setpoints, one axis at a time.
@@ -102,13 +107,30 @@ POINT_LAG = 0.3           # point model velocity time constant (s)
 V_SCALE = 3.0
 DIST_SCALE = 30.0
 
+# What a drone is told about the other drones near it (rl/swarm.py). The lidar
+# alone is not enough for them: a drone is a 0.7 m cube and the rays are 22.5
+# degrees apart, so at 3 m a ray touches it less than half the time, and a
+# range reading says nothing about where it is heading. In the large evaluation
+# the policies that only had the lidar hit other drones as often as flying
+# straight does. So the drones are assumed to broadcast their position and
+# velocity, which the Gazebo side already does for the collision monitors.
+NEIGHBOUR_FEATURES = 10       # values per neighbour, see neighbour_features()
+NEIGHBOUR_RANGE = 6.0         # neighbours further away than this are left out (m)
+NEIGHBOUR_MISS_RANGE = 4.0    # predicted passing distances beyond this read as 0 (m)
+NEIGHBOUR_HORIZON = 5.0       # how far ahead the closest approach is looked for (s)
+
 # Reward. The progress term is the main signal; the rest shape it.
 PROGRESS = 1.0            # per metre closer to the target
-TIME_COST = 0.01          # per decision, so dawdling is not free
+TIME_COST = 0.01          # per decision, so flying slowly costs something
 SAFE_DISTANCE = 1.0       # clearance below which the proximity cost starts (m)
 NEAR_COST = 0.1           # proximity cost at zero clearance, per decision
-CRASH_COST = 10.0         # hitting a box or the ground, or leaving the workspace
+CRASH_COST = 10.0         # hitting a box, the ground or another drone, or
+                          # leaving the workspace
 ARRIVAL_BONUS = 10.0
+# The same proximity cost for other drones, starting further out because they
+# move: two drones flying at each other close a 2 m gap in about a second.
+DRONE_SAFE_DISTANCE = 2.0 # gap to another drone below which its cost starts (m)
+DRONE_NEAR_COST = 0.5     # that cost at zero gap, per decision
 
 
 def build_observation(lidar, pos, vel, target, boxes, v_scale=V_SCALE,
@@ -117,7 +139,7 @@ def build_observation(lidar, pos, vel, target, boxes, v_scale=V_SCALE,
 
     This is the only place the observation is put together. The training
     environment calls it, and so does the code that flies the policy in
-    Gazebo (rl/policy.py), so the two can never drift apart.
+    Gazebo (rl/policy.py), so the two are always the same.
     """
     pos = np.asarray(pos, dtype=np.float64)
     vel = np.asarray(vel, dtype=np.float64)
@@ -139,6 +161,76 @@ def clip_action(action):
     a = np.clip(np.asarray(action, dtype=np.float64).reshape(3), -1.0, 1.0)
     norm = float(np.linalg.norm(a))
     return a / norm if norm > 1.0 else a
+
+
+def neighbour_features(pos, vel, others_pos, others_vel, count,
+                       reach=NEIGHBOUR_RANGE, miss_reach=NEIGHBOUR_MISS_RANGE,
+                       horizon=NEIGHBOUR_HORIZON, v_scale=V_SCALE):
+    """What the policy is told about the `count` nearest other drones.
+
+    Ten numbers per neighbour, nearest first, all zero for a slot with no
+    drone within `reach`:
+
+      0-2  the direction to it, scaled by how close it is: length 0 at
+           `reach`, growing towards 1 as it gets nearer
+      3-5  its velocity relative to this drone, / v_scale, clipped
+      6-8  the predicted passing: where it will be, relative to this drone,
+           at the moment the two are closest if both keep their velocity (at
+           most `horizon` seconds ahead). The same scaling by closeness, with
+           `miss_reach`: length 1 means they are heading for the same point.
+      9    how soon that moment is: 1 = now, 0 = `horizon` seconds away or the
+           two are moving apart
+
+    Moving away from the predicted passing vector makes the pass wider, which
+    is what avoiding the other drone needs. It is also opposite for the two drones of a
+    pair, so two drones that both move away from it move apart.
+
+    Like build_observation(), this is the only place these numbers are put
+    together, for training and for flying in Gazebo.
+    """
+    out = np.zeros((int(count), NEIGHBOUR_FEATURES), dtype=np.float32)
+    others_pos = np.asarray(others_pos, dtype=np.float64).reshape(-1, 3)
+    if not count or not len(others_pos):
+        return out.reshape(-1)
+    others_vel = np.asarray(others_vel, dtype=np.float64).reshape(-1, 3)
+    if len(others_vel) != len(others_pos):
+        raise ValueError(f"{len(others_pos)} neighbour positions but "
+                         f"{len(others_vel)} velocities")
+    pos = np.asarray(pos, dtype=np.float64)
+    vel = np.asarray(vel, dtype=np.float64)
+
+    rel = others_pos - pos
+    dist = np.linalg.norm(rel, axis=1)
+    slot = 0
+    for j in np.argsort(dist, kind="stable"):
+        d = float(dist[j])
+        if slot >= count or d >= reach:
+            break
+        r = rel[j]
+        w = others_vel[j] - vel
+        speed2 = float(w @ w)
+        closing = -float(r @ w)
+        approaching = closing > 0.0 and speed2 > 1e-9
+        t = min(closing / speed2, horizon) if approaching else 0.0
+        miss = r + w * t
+        miss_dist = float(np.linalg.norm(miss))
+        if miss_dist > 1e-6:
+            side = miss / miss_dist
+        else:
+            # Heading for the same point: any sideways direction
+            # will do, as long as the two drones of the pair get opposite
+            # ones, which a cross product with their relative velocity gives.
+            side = np.cross(w, (0.0, 0.0, 1.0))
+            norm = float(np.linalg.norm(side))
+            side = side / norm if norm > 1e-9 else np.array([1.0, 0.0, 0.0])
+
+        if d > 1e-9:
+            out[slot, 0:3] = (1.0 - d / reach) * (r / d)
+        out[slot, 3:6] = np.clip(w / v_scale, -1.0, 1.0)
+        out[slot, 6:9] = max(0.0, 1.0 - miss_dist / miss_reach) * side
+        out[slot, 9] = 1.0 - t / horizon if approaching else 0.0
+        slot += 1
+    return out.reshape(-1)
 
 
 def clearance_to_boxes(pos, boxes, radius=DRONE_RADIUS):
@@ -264,14 +356,18 @@ class MazeEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, dynamics="mujoco", n_obstacles=(0, 20), lidar=None,
-                 max_decisions=MAX_DECISIONS):
+                 max_decisions=MAX_DECISIONS, neighbours=0):
         super().__init__()
         self.dyn = make_dynamics(dynamics)
         self.n_range = (int(n_obstacles[0]), int(n_obstacles[1]))
         self.lidar = lidar or Lidar()
         self.max_decisions = int(max_decisions)
+        # A policy trained with other drones expects their inputs too. There
+        # are none here, so they are all zero.
+        self.no_neighbours = np.zeros(int(neighbours) * NEIGHBOUR_FEATURES,
+                                      dtype=np.float32)
 
-        n_obs = self.lidar.n_rays + 8
+        n_obs = self.lidar.n_rays + 8 + len(self.no_neighbours)
         self.observation_space = spaces.Box(-1.0, 1.0, (n_obs,), np.float32)
         self.action_space = spaces.Box(-1.0, 1.0, (3,), np.float32)
 
@@ -380,7 +476,8 @@ class MazeEnv(gym.Env):
     # --- helpers --------------------------------------------------------
 
     def _obs(self):
-        return build_observation(self.lidar, self.pos, self.vel, self.target, self.boxes)
+        obs = build_observation(self.lidar, self.pos, self.vel, self.target, self.boxes)
+        return np.concatenate([obs, self.no_neighbours]) if len(self.no_neighbours) else obs
 
     def _info(self, outcome):
         return {

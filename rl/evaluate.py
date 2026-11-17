@@ -12,6 +12,11 @@ straight and with the policy, and listed next to what PX4 did there flying
 straight. This shows which scenarios the policy should save, and gives a
 scenario by scenario comparison with Gazebo for the policy as well.
 
+The same comparison of observations is then made with four drones in a maze,
+where the wrapper is given the other drones' positions and velocities the way
+the Gazebo node gives them, so the lidar cubes and the neighbour inputs are
+covered as well.
+
 The report also goes to rl/logs/evaluate_<run>.txt.
 
 Usage (in the VM, after  source rl/env.sh):
@@ -67,6 +72,30 @@ def fly(env, n, seed, policy=None, check=None):
             return info
 
 
+def fly_group(policy, dynamics, check):
+    """Four drones per maze, every decision through the deployment wrapper."""
+    from swarm import Scene
+    scene = Scene(4, dynamics=dynamics, respawn=False, lidar=policy.lidar,
+                  neighbours=policy.neighbours)
+    outcomes = Counter()
+    for n in (4, 8, 12, 16, 20):
+        obs = scene.reset(n=n, seed=1)
+        while not scene.finished:
+            flying = [i for i in range(scene.k) if scene.present[i]]
+            actions = np.zeros((scene.k, 3))
+            for i in flying:
+                others = [j for j in flying if j != i]
+                built = policy.observe(
+                    scene.pos[i], scene.vel[i], scene.target[i], scene.boxes,
+                    others=scene.pos[others], neighbours=scene.pos[others],
+                    neighbour_velocities=scene.vel[others])
+                check.append(float(np.max(np.abs(built - obs[i]))))
+                actions[i] = policy.action(built)
+            obs, _, dones, infos = scene.step(actions)
+            outcomes.update(info["outcome"] for info, done in zip(infos, dones) if done)
+    return outcomes
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("run", type=Path, help="run directory, or a model .zip inside one")
@@ -77,7 +106,8 @@ def main():
     policy = AvoidancePolicy(args.run)
     dynamics = args.dynamics or (policy.dynamics if policy.dynamics in ("mujoco", "point")
                                  else "mujoco")
-    env = maze.MazeEnv(dynamics=dynamics, lidar=policy.lidar)
+    env = maze.MazeEnv(dynamics=dynamics, lidar=policy.lidar,
+                       neighbours=policy.neighbours)
     gazebo = gazebo_straight()
 
     say(f"evaluation {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -116,7 +146,13 @@ def main():
     worst = max(diffs) if diffs else float("nan")
     say(f"deployment observation vs training observation, over {len(diffs)} decisions: "
         f"largest difference {worst:.2e}")
-    ok = worst < 1e-5
+
+    group_diffs = []
+    group = fly_group(policy, dynamics, group_diffs)
+    group_worst = max(group_diffs) if group_diffs else float("nan")
+    say(f"the same with four drones per maze ({dict(group)}), over "
+        f"{len(group_diffs)} decisions: largest difference {group_worst:.2e}")
+    ok = worst < 1e-5 and group_worst < 1e-5
     say("PASS  the wrapper builds the same observation as training" if ok else
         "FAIL  the wrapper's observation differs from training")
 

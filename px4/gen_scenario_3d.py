@@ -5,15 +5,15 @@ Builds the maze described in the evaluation plan: n obstacles placed at random,
 each a parallelepiped standing on the ground and reaching a randomly chosen
 height. Then places k drones at random, each with its own target in 3D space.
 
-Everything is written to one file, scenario.yaml, which is the single source of
-truth for the run:
+Everything is written to one file, scenario.yaml, and every other script reads
+the run from it:
 
   spawn_obstacles.py   spawns the boxes into the running Gazebo world
   collision_monitor_3d.py  checks the drones against the same boxes
   run_mission.py       flies each drone to its target
 
-Obstacles are spawned into PX4's default world at runtime rather than baked
-into a world file, so the PX4 installation stays untouched.
+Obstacles are spawned into PX4's default world at runtime instead of being
+written into a world file, so the PX4 installation stays untouched.
 
 Usage:
   ./gen_scenario_3d.py --n-obstacles 8 --seed 1

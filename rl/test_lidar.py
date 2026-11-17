@@ -83,7 +83,7 @@ def test_grazing_an_edge_counts():
 
 
 def test_just_past_the_edge_misses():
-    # A hair outside y = 1 it misses.
+    # Just outside y = 1 it misses.
     close(ray((0, 1.0001, 1), (1, 0, 0), WALL), R)
 
 

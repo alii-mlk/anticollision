@@ -6,15 +6,29 @@ Reads every run directory produced by run_batch_3d.py and reports, for each
 
   collisions        number of drones destroyed (obstacles and drone-drone)
   euclidean         summed start-to-target distance over the drones
-  travelled         summed distance actually flown
+  travelled         summed distance flown
   ratio             travelled / euclidean, over every drone
   ratio+            the same, over only the drones that reached their target
   sim time          simulation time of the run
   cpu time          processor time used by the simulator and autopilots
   ctrl              processor time of the mission nodes, i.e. the controller:
                     next to nothing flying straight, the network with a policy
+  ram, ctrl ram     peak resident memory of the simulator, autopilots and
+                    bridges, and of the mission and monitor nodes (MB; zero
+                    for batches recorded before memory was sampled)
+
+Batches that recorded it get a second table with the memory per part of the
+stack. There every shared page is divided among the processes that share it,
+so the parts add up to a total that counts nothing twice. Next to it stand the
+summed resident memory, which counts shared pages once per process and is an
+upper bound, and the drop of the machine's available memory from before the
+stack was started to its lowest point in the flight.
 
 Values are averaged over the seeds of a configuration.
+
+Besides metrics.csv, with one row per run, it writes drones.csv with one row
+per drone: its outcome, distances, flight time, closest approach to an
+obstacle, and the processor time and number of decisions of its mission node.
 
 Simulation time and wall-clock time are reported separately, along with the
 real time factor between them. They are equal only while the machine can run
@@ -46,6 +60,14 @@ def to_float(value, default=0.0):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+MEMORY_PARTS = ("gazebo", "px4", "mavros", "helpers", "mission", "monitor")
+
+# One drone's line in the summary of a run, as run_multi_mission.py writes it.
+DRONE_LINE = re.compile(
+    r"\{id: (\d+), outcome: (\w+), euclidean: ([\d.]+), travelled: ([\d.]+), "
+    r"time: ([\d.]+), min_clearance: ([-\d.]+), collided_with: ([^}]+)\}")
 
 
 def collect(batch_dir):
@@ -83,7 +105,50 @@ def collect(batch_dir):
             "cpu_time": to_float(summary.get("cpu_time")),
             "controller_cpu_time": to_float(summary.get("controller_cpu_time")),
             "wall_time": to_float(summary.get("wall_time")),
+            "memory_simulation_mb": to_float(summary.get("memory_simulation_mb")),
+            "memory_controller_mb": to_float(summary.get("memory_controller_mb")),
+            "memory_free_min_mb": to_float(summary.get("memory_free_min_mb")),
+            # Empty for batches recorded before these were measured.
+            "memory_free_before_mb": to_float(
+                summary.get("memory_free_before_mb"), None),
+            **{f"memory_pss_{part}_mb": to_float(
+                summary.get(f"memory_pss_{part}_mb"), None)
+               for part in MEMORY_PARTS},
+            # The wall-clock interval over which cpu_time was measured.
+            "wall_time_measured": to_float(
+                summary.get("wall_time_measured"), None),
         })
+    return rows
+
+
+def collect_drones(batch_dir):
+    """One row per drone of every run that produced a summary."""
+    rows = []
+    for run_dir in sorted(batch_dir.iterdir()):
+        m = re.match(r"n(\d+)_k(\d+)_s(\d+)$", run_dir.name)
+        summary = run_dir / "run" / "summary.yaml"
+        if not m or not summary.exists():
+            continue
+        n, k, seed = (int(g) for g in m.groups())
+        for d in DRONE_LINE.finditer(summary.read_text()):
+            i, outcome, euclidean, travelled, t, clearance, hit = d.groups()
+            mission = read_scalars(
+                run_dir / "run" / f"drone{i}" / "mission.yaml")
+            rows.append({
+                "run": run_dir.name,
+                "n_obstacles": n,
+                "k_drones": k,
+                "seed": seed,
+                "drone": int(i),
+                "outcome": outcome,
+                "euclidean": float(euclidean),
+                "travelled": float(travelled),
+                "time": float(t),
+                "min_clearance": float(clearance),
+                "collided_with": hit.strip(),
+                "controller_cpu_time": to_float(mission.get("cpu_time"), None),
+                "decisions": to_float(mission.get("policy_decisions"), None),
+            })
     return rows
 
 
@@ -100,7 +165,8 @@ def summarize(rows):
     header = (f"{'n':>3} {'k':>3} {'runs':>5} {'reached':>9} {'coll':>5} "
               f"{'(obst/drone)':>13} {'euclid(m)':>10} {'travel(m)':>10} "
               f"{'ratio':>7} {'ratio+':>7} {'sim(s)':>8} {'wall(s)':>8} "
-              f"{'rtf':>6} {'cpu(s)':>8} {'ctrl(s)':>8}")
+              f"{'rtf':>6} {'cpu(s)':>8} {'ctrl(s)':>8} "
+              f"{'ram(MB)':>8} {'ctrl ram':>9}")
     lines = [header, "-" * len(header)]
 
     for (n, k) in sorted(groups):
@@ -132,7 +198,38 @@ def summarize(rows):
             f"{mean([r['wall_time'] for r in ok]):>8.1f} "
             f"{mean([r['real_time_factor'] for r in ok]):>6.2f} "
             f"{mean([r['cpu_time'] for r in ok]):>8.0f} "
-            f"{mean([r['controller_cpu_time'] for r in ok]):>8.1f}")
+            f"{mean([r['controller_cpu_time'] for r in ok]):>8.1f} "
+            f"{mean([r['memory_simulation_mb'] for r in ok]):>8.0f} "
+            f"{mean([r['memory_controller_mb'] for r in ok]):>9.0f}")
+    return "\n".join(lines)
+
+
+def summarize_memory(rows):
+    """Memory per part of the stack, or None if the batch did not record it."""
+    groups = {}
+    for r in rows:
+        if r["status"] == "OK" and r["memory_pss_gazebo_mb"] is not None:
+            groups.setdefault((r["n_obstacles"], r["k_drones"]), []).append(r)
+    if not groups:
+        return None
+
+    header = (f"{'n':>3} {'k':>3} {'runs':>5} "
+              + " ".join(f"{part:>8}" for part in MEMORY_PARTS)
+              + f" {'total':>8} {'resident':>9} {'free drop':>10}")
+    lines = ["memory in MB, shared pages divided among the processes that "
+             "share them", header, "-" * len(header)]
+    for (n, k) in sorted(groups):
+        rs = groups[(n, k)]
+        parts = [mean([r[f"memory_pss_{part}_mb"] for r in rs])
+                 for part in MEMORY_PARTS]
+        resident = mean([r["memory_simulation_mb"] + r["memory_controller_mb"]
+                         for r in rs])
+        drops = [r["memory_free_before_mb"] - r["memory_free_min_mb"]
+                 for r in rs if r["memory_free_before_mb"] is not None]
+        drop = f"{mean(drops):>10.0f}" if drops else f"{'-':>10}"
+        lines.append(f"{n:>3} {k:>3} {len(rs):>5} "
+                     + " ".join(f"{p:>8.0f}" for p in parts)
+                     + f" {sum(parts):>8.0f} {resident:>9.0f} {drop}")
     return "\n".join(lines)
 
 
@@ -153,7 +250,17 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
+    drones = collect_drones(batch_dir)
+    if drones:
+        with open(batch_dir / "drones.csv", "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(drones[0].keys()))
+            writer.writeheader()
+            writer.writerows(drones)
+
     table = summarize(rows)
+    memory = summarize_memory(rows)
+    if memory:
+        table += "\n\n" + memory
     (batch_dir / "summary.txt").write_text(table + "\n")
 
     statuses = {}

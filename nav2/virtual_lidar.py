@@ -3,12 +3,12 @@
 odometry pose against a known list of box obstacles.
 
 Replaces the Gazebo gpu_lidar sensor, which requires GPU rendering that is
-unavailable in this VM (VMware SVGA3D is too unstable for OGRE2). From Nav2's
-perspective the output is a normal sensor_msgs/LaserScan on /scan.
+unavailable in this VM (VMware SVGA3D is too unstable for OGRE2). For Nav2
+the output is a normal sensor_msgs/LaserScan on /scan.
 
 Obstacles come from the `scenario_file` ROS parameter (a scenario.yaml
-written by gen_scenario.py, the single source of truth for generated
-scenarios). Without the parameter, falls back to the built-in list matching
+written by gen_scenario.py, which every node of a generated scenario
+reads). Without the parameter, falls back to the built-in list matching
 the hand-written drone_nav2_world.sdf. Each obstacle is an axis-aligned box
 footprint: (x_min, x_max, y_min, y_max).
 """

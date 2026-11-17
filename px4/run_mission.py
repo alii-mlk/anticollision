@@ -9,7 +9,7 @@ the two can be compared directly:
   --policy    the trained avoidance policy (rl/policy.py). After the same
               climb to take-off altitude, about ten times a second it builds
               the policy's observation from the scenario's boxes, the other
-              drones' positions and its own state, and flies the chosen
+              drones' positions and velocities and its own state, and flies the chosen
               direction as an offboard velocity setpoint at the speeds the
               policy trained under. Needs the RL venv: source rl/env.sh.
 
@@ -22,17 +22,15 @@ converted with
 
     local = world - start
 
-Time is measured on Gazebo's clock, not the wall clock. On a machine that
-cannot run the simulation at full speed the two are not the same thing: with
-three drones the simulator may only manage a third of real time, so a flight
-that takes 40 simulated seconds occupies two wall-clock minutes. The flight
-itself is unaffected, and simulated time is the honest measure of it, so
-`--timeout` counts simulated seconds. `--wall-timeout` is only a safety net
-for a simulation that has stopped advancing at all.
+Time is measured on Gazebo's clock. On a machine that cannot run the
+simulation at full speed this differs from the wall clock: if the simulator
+only manages a third of real time, a flight of 40 simulated seconds takes two
+minutes. The flight itself is the same, so `--timeout` counts simulated
+seconds. `--wall-timeout` is only a safety net for a simulation that has
+stopped.
 
-If nothing is publishing /clock the node falls back to counting wall-clock
-time, which is what it always did and is correct when the simulation runs at
-full speed.
+If nothing publishes /clock the node counts wall-clock time instead, which is
+correct as long as the simulation runs at full speed.
 
 Results are written to <out>/mission.yaml, and the flown path to
 <out>/trajectory.csv, giving the travelled distance and the ratio against the
@@ -68,7 +66,7 @@ PRESTREAM_SETPOINTS = 40      # ~2 s of setpoints before requesting OFFBOARD
 TAKEOFF_ALTITUDE = 3.0        # climb here first, then head for the target
 TAKEOFF_TOLERANCE = 0.8
 
-# Travelled distance is measured on a smoothed position, not on raw samples.
+# The travelled distance is measured on a smoothed position.
 # Pose arrives tens of times per second and each sample carries a little
 # estimator jitter; summing raw steps turns that jitter into tens of metres of
 # phantom travel (a hovering drone measured 16 m in one test). Low-pass
@@ -84,14 +82,13 @@ MIN_STEP_M = 0.05
 DISARM_GRACE_S = 2.0
 
 # How much wall-clock time a run is allowed per second of its simulated
-# timeout, when no explicit wall-clock limit is given. Five covers a simulation
-# running at a fifth of real time, which is well past anything usable; below
-# that the run is not slow, it is stuck.
+# timeout, when no explicit wall-clock limit is given. Five allows a simulation
+# running at a fifth of real time. Slower than that the run is stuck.
 DEFAULT_WALL_TIMEOUT_FACTOR = 5.0
 
 # How often to re-ask for offboard mode and for arming, in wall-clock seconds.
 # These are asked for repeatedly rather than once: an attempt made before the
-# MAVROS services have finished being discovered is simply lost, and PX4 may
+# MAVROS services have been discovered is lost, and PX4 may
 # refuse the first request anyway.
 REQUEST_INTERVAL_S = 1.0
 
@@ -109,7 +106,12 @@ ARM_DEADLINE_S = 60.0
 # handed the policy an unusual starting state, without any error. Restarting
 # the stack (start_px4_multi.sh) puts every drone back on the ground at its
 # start. The batch sweep does this for every run.
-START_MAX_HEIGHT = 0.5
+#
+# The height limit is large because just after boot PX4's altitude estimate
+# can be several tens of centimetres off while the drone is on the ground
+# (0.6 m once, which a 0.5 m limit refused). A drone still coming back from an
+# earlier flight is metres up and armed.
+START_MAX_HEIGHT = 2.0
 START_MAX_OFFSET = 1.0
 
 RL_DIR =Path(__file__).resolve().parent.parent / "rl"
@@ -196,9 +198,13 @@ class MissionRunner(Node):
 
         # Only the policy needs these: its own velocity, which is part of the
         # observation, the other drones' positions, which go into its lidar,
-        # and a velocity setpoint to fly what it chooses.
+        # their velocities and whether they are still flying, for a policy
+        # that is told about its neighbours, and a velocity setpoint to fly
+        # what it chooses.
         self.vel = (0.0, 0.0, 0.0)
         self.others = {}
+        self.others_vel = {}
+        self.others_destroyed = {}
         self.decisions = 0
         self.last_decision = None
         self.velocity_cmd = (0.0, 0.0, 0.0)
@@ -212,6 +218,12 @@ class MissionRunner(Node):
                     self.create_subscription(
                         PointStamped, f"/drone_world_position/drone{other}",
                         self.make_other_cb(other), 10)
+                    self.create_subscription(
+                        TwistStamped, f"/drone_world_velocity/drone{other}",
+                        self.make_other_velocity_cb(other), 10)
+                    self.create_subscription(
+                        Bool, f"/collision_monitor/drone{other}/destroyed",
+                        self.make_other_destroyed_cb(other), 10)
             self.velocity_pub = self.create_publisher(
                 TwistStamped, f"{ns}/setpoint_velocity/cmd_vel", 10)
             self.get_logger().info(f"Flying with policy {self.policy.describe()}")
@@ -274,6 +286,17 @@ class MissionRunner(Node):
             self.others[other_id] = (msg.point.x, msg.point.y, msg.point.z)
         return cb
 
+    def make_other_velocity_cb(self, other_id):
+        def cb(msg):
+            v = msg.twist.linear
+            self.others_vel[other_id] = (v.x, v.y, v.z)
+        return cb
+
+    def make_other_destroyed_cb(self, other_id):
+        def cb(msg):
+            self.others_destroyed[other_id] = bool(msg.data)
+        return cb
+
     def make_velocity(self, xyz):
         cmd = TwistStamped()
         cmd.header.stamp = self.get_clock().now().to_msg()
@@ -288,8 +311,15 @@ class MissionRunner(Node):
             return
         self.last_decision = self.elapsed
         world = tuple(p + s for p, s in zip(self.local_pos, self.start))
-        obs = self.policy.observe(world, self.vel, self.target_world, self.boxes,
-                                  list(self.others.values()))
+        # Every other drone is in the lidar, wrecks included. Only the ones
+        # still flying count as neighbours: in training a destroyed drone is
+        # gone, and a wreck on the ground must not take a neighbour's place.
+        flying = [j for j in self.others if not self.others_destroyed.get(j, False)]
+        obs = self.policy.observe(
+            world, self.vel, self.target_world, self.boxes,
+            list(self.others.values()),
+            neighbours=[self.others[j] for j in flying],
+            neighbour_velocities=[self.others_vel.get(j, (0.0, 0.0, 0.0)) for j in flying])
         self.velocity_cmd = tuple(self.policy.velocity(self.policy.action(obs)))
         self.decisions += 1
 
@@ -403,8 +433,8 @@ class MissionRunner(Node):
             return
 
         # An unexpected disarm means PX4 gave up on the flight, typically a
-        # failsafe landing it. Waiting out the timeout in that state tells us
-        # nothing and costs minutes in a batch sweep, so end the run. The grace
+        # failsafe landing it. Waiting for the timeout in that state only costs
+        # minutes in a batch sweep, so the run ends here. The grace
         # period lets a collision's "destroyed" message win the race, since a
         # collision disarms the drone too.
         if self.was_armed and not self.state.armed:
@@ -516,6 +546,10 @@ class MissionRunner(Node):
             f"wall_time: {self.wall_elapsed:.2f}\n"
             f"real_time_factor: {self.real_time_factor:.3f}\n"
             f"clock_source: {'gazebo' if self.sim_now is not None else 'wall'}\n"
+            # The times in trajectory.csv count from this /clock reading. Every
+            # node starts its count when it starts, so the drones of one run
+            # can only be compared at the same moment after adding it.
+            f"sim_start: {self.sim_start if self.sim_start is not None else '-'}\n"
             f"final_world_position: {{x: {w[0]:.3f}, y: {w[1]:.3f}, z: {w[2]:.3f}}}\n"
             f"target_world_position: {{x: {self.target_world[0]:.3f}, "
             f"y: {self.target_world[1]:.3f}, z: {self.target_world[2]:.3f}}}\n"

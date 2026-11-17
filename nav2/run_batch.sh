@@ -28,7 +28,7 @@ set -u
 
 N_LIST="${N_LIST:-1 2 4 6 8 10}"
 SEEDS="${SEEDS:-1 2 3 4 5}"
-OBSTACLE_SPEED="${OBSTACLE_SPEED:-0}"   # m/s; > 0 = moving obstacles (Phase C)
+OBSTACLE_SPEED="${OBSTACLE_SPEED:-0}"   # m/s; > 0 = moving obstacles
 GOAL_TIMEOUT="${GOAL_TIMEOUT:-240}"     # wall seconds per goal attempt
 BATCH_DIR="$WORKDIR/runs/batch_$(date +%Y%m%d_%H%M%S)"
 

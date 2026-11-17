@@ -1,0 +1,32 @@
+part          pid  resident MB  proportional MB  command
+gazebo      34502        255.5            217.8  gz sim --verbose=1 -r -s /home/ali/px4/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf
+helpers     34332          2.1              0.4  bash /mnt/hgfs/thesis/anticollision/px4/start_px4_multi.sh --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_20261116_203353_policy
+helpers     34333         44.2             29.3  python3 gcs_heartbeat.py --port 18570 --set CBRK_SUPPLY_CHK=894281 --set COM_DISARM_PRFLT=0 --set SIM_BAT_MIN_PCT=90 --set SDLOG_MODE=-1
+helpers     34746          2.1              0.4  bash /mnt/hgfs/thesis/anticollision/px4/start_px4_multi.sh --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_20261116_203353_policy
+helpers     34747         44.2             29.3  python3 gcs_heartbeat.py --port 18571 --set CBRK_SUPPLY_CHK=894281 --set COM_DISARM_PRFLT=0 --set SIM_BAT_MIN_PCT=90 --set SDLOG_MODE=-1
+helpers     35127          2.1              0.4  bash /mnt/hgfs/thesis/anticollision/px4/start_px4_multi.sh --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_20261116_203353_policy
+helpers     35128         44.2             29.3  python3 gcs_heartbeat.py --port 18572 --set CBRK_SUPPLY_CHK=894281 --set COM_DISARM_PRFLT=0 --set SIM_BAT_MIN_PCT=90 --set SDLOG_MODE=-1
+helpers     35508          2.1              0.4  bash /mnt/hgfs/thesis/anticollision/px4/start_px4_multi.sh --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_20261116_203353_policy
+helpers     35509         44.2             29.3  python3 gcs_heartbeat.py --port 18573 --set CBRK_SUPPLY_CHK=894281 --set COM_DISARM_PRFLT=0 --set SIM_BAT_MIN_PCT=90 --set SDLOG_MODE=-1
+helpers     35887         27.7             16.9  /usr/bin/python3 /opt/ros/jazzy/bin/ros2 run mavros mavros_node --ros-args -r __ns:=/uav0 -p fcu_url:=udp://:14540@127.0.0.1:14580 -p tgt_sy
+helpers     35926         27.7             16.9  /usr/bin/python3 /opt/ros/jazzy/bin/ros2 run mavros mavros_node --ros-args -r __ns:=/uav1 -p fcu_url:=udp://:14541@127.0.0.1:14581 -p tgt_sy
+helpers     35968         27.7             16.9  /usr/bin/python3 /opt/ros/jazzy/bin/ros2 run mavros mavros_node --ros-args -r __ns:=/uav2 -p fcu_url:=udp://:14542@127.0.0.1:14582 -p tgt_sy
+helpers     36007         27.7             16.9  /usr/bin/python3 /opt/ros/jazzy/bin/ros2 run mavros mavros_node --ros-args -r __ns:=/uav3 -p fcu_url:=udp://:14543@127.0.0.1:14583 -p tgt_sy
+helpers     36049         27.7             16.9  /usr/bin/python3 /opt/ros/jazzy/bin/ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
+helpers     36060         71.2             46.1  /opt/ros/jazzy/lib/ros_gz_bridge/parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
+mavros      35900        399.8            359.4  /opt/ros/jazzy/lib/mavros/mavros_node --ros-args -r __ns:=/uav0 -p fcu_url:=udp://:14540@127.0.0.1:14580 -p tgt_system:=1 -p tgt_component:=
+mavros      35939        403.6            363.0  /opt/ros/jazzy/lib/mavros/mavros_node --ros-args -r __ns:=/uav1 -p fcu_url:=udp://:14541@127.0.0.1:14581 -p tgt_system:=2 -p tgt_component:=
+mavros      35981        400.1            360.0  /opt/ros/jazzy/lib/mavros/mavros_node --ros-args -r __ns:=/uav2 -p fcu_url:=udp://:14542@127.0.0.1:14582 -p tgt_system:=3 -p tgt_component:=
+mavros      36020        401.6            361.2  /opt/ros/jazzy/lib/mavros/mavros_node --ros-args -r __ns:=/uav3 -p fcu_url:=udp://:14543@127.0.0.1:14583 -p tgt_system:=4 -p tgt_component:=
+mission     36243        475.7            327.5  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/run_mission.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_202
+mission     36244        475.8            327.6  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/run_mission.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_202
+mission     36245        478.6            330.4  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/run_mission.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_202
+mission     36246        475.6            327.5  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/run_mission.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/batch_202
+monitor     36182         95.5             61.8  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/collision_monitor_3d.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/
+monitor     36183         95.8             62.0  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/collision_monitor_3d.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/
+monitor     36184         95.9             62.0  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/collision_monitor_3d.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/
+monitor     36185         96.3             62.4  /home/ali/rlenv/bin/python3 /mnt/hgfs/thesis/anticollision/px4/collision_monitor_3d.py --scenario /mnt/hgfs/thesis/anticollision/px4/runs3d/
+px4         34335         18.2              6.1  ./build/px4_sitl_default/bin/px4 -i 0
+px4         34749         18.2              6.1  ./build/px4_sitl_default/bin/px4 -i 1
+px4         35130         18.2              6.2  ./build/px4_sitl_default/bin/px4 -i 2
+px4         35511         18.2              6.1  ./build/px4_sitl_default/bin/px4 -i 3

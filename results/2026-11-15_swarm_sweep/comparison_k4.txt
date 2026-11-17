@@ -1,0 +1,46 @@
+straight: batch_20261116_054900_straight
+policy:   batch_20261116_111911_policy
+
+Per configuration, straight -> policy (5 seeds each)
+
+  n   k           reached   collisions/run          ratio+    mission(s)   ctrl cpu(s)
+--------------------------------------------------------------------------------------
+  4   4    14/20 -> 20/20       1.2 -> 0.0   1.099 -> 1.182      12 -> 32   5.9 -> 26.5
+  8   4    12/20 -> 19/20       1.6 -> 0.2   1.105 -> 1.244      12 -> 34   5.4 -> 27.4
+ 12   4    11/20 -> 19/20       1.8 -> 0.2   1.104 -> 1.266      12 -> 35   5.3 -> 27.6
+ 16   4     8/20 -> 17/20       2.4 -> 0.6   1.114 -> 1.296      11 -> 35   5.0 -> 27.9
+ 20   4     4/20 -> 18/20       3.2 -> 0.4   1.117 -> 1.355      11 -> 37   4.8 -> 30.5
+--------------------------------------------------------------------------------------
+all drones: reached 49/100 -> 93/100 (49% -> 93%), destroyed 51 -> 7
+
+Per drone (same drone, same scenario)
+
+  k=4: destroyed 51/100 (51%) -> 7/100 (7%)
+  saved 44, lost 0, destroyed both ways 7
+
+Closest approach to an obstacle, drones that arrived
+
+  straight, arrived both ways     49 drones, clearance median 1.27 m, min 0.04 m, under 0.5 m: 12, mean speed 1.66 m/s
+  policy, arrived both ways       49 drones, clearance median 1.44 m, min 0.40 m, under 0.5 m:  2, mean speed 0.79 m/s
+  policy, saved drones            44 drones, clearance median 0.58 m, min 0.01 m, under 0.5 m: 16, mean speed 0.83 m/s
+
+Closest approach between drones in the air, runs with k > 1
+
+  straight 25 runs, drones destroyed by touching another drone: 2, closest: n12_k4_s3 at least 0.41 m, n4_k4_s5 at least 0.49 m, n8_k4_s5 at least 0.57 m
+  policy   25 runs, drones destroyed by touching another drone: 0, closest: n16_k4_s1 at least 1.25 m, n4_k4_s1 at least 1.49 m, n12_k4_s1 at least 1.50 m
+
+  These runs did not record when each drone's clock started (each
+  mission node counts from its own start, up to about a second apart),
+  so the distances are lower bounds: the closest the two drones could
+  have been for any offset between their clocks up to 2 s.
+  Contacts are counted by the collision monitor from live positions.
+
+Crashes under the policy, nearest other drone in the last 5 s before the crash
+
+  n12_k4_s3   drone 1  at  26.0 s  hit an obstacle  at least 6.4 m (drone 2)
+  n16_k4_s1   drone 2  at  15.3 s  hit an obstacle  at least 5.8 m (drone 1)
+  n16_k4_s3   drone 1  at  26.9 s  hit an obstacle  at least 7.4 m (drone 2)
+  n16_k4_s4   drone 3  at  19.5 s  hit an obstacle  at least 3.5 m (drone 0)
+  n20_k4_s3   drone 1  at  26.6 s  hit an obstacle  at least 5.7 m (drone 3)
+  n20_k4_s4   drone 3  at  20.3 s  hit an obstacle  at least 3.4 m (drone 0)
+  n8_k4_s4    drone 3  at  24.8 s  hit an obstacle  at least 4.0 m (drone 0)

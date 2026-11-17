@@ -1,0 +1,12 @@
+drones,controller,runs,touched,"closest, at least (m)","median, at least (m)"
+2,straight,25,1,0.33,3.11
+2,trained alone,25,0,1.97,5.87
+2,final policy,25,0,1.74,6.26
+3,straight,25,2,0.39,2.54
+3,trained alone,25,0,1.99,3.22
+3,final policy,25,0,1.93,4.16
+4,straight,25,2,0.41,1.73
+4,final policy,25,0,1.25,3.19
+all,straight,75,5,0.33,2.55
+all,trained alone,50,0,1.97,5.07
+all,final policy,75,0,1.25,4.04

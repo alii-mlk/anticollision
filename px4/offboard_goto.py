@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Fly the PX4 drone to a 3D target using MAVROS offboard position setpoints.
 
-This is the control path Phase E needs: unlike AUTO.TAKEOFF (which only uses
-PX4's own takeoff altitude), offboard mode lets ROS 2 choose an arbitrary
-target in 3D.
+This is the control path the 3D missions use: unlike AUTO.TAKEOFF (which only
+uses PX4's own takeoff altitude), offboard mode lets ROS 2 choose any target
+in 3D.
 
 PX4 will not enter OFFBOARD mode unless setpoints are already streaming at
 more than 2 Hz, and it drops out of OFFBOARD if the stream stalls. So the

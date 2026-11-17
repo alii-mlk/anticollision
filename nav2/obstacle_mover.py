@@ -7,10 +7,10 @@ integrates each obstacle's motion on sim time (straight line at its scenario
 velocity, bouncing elastically off the workspace bounds) and publishes the
 current footprints as a visualization_msgs/MarkerArray on /obstacles at 20 Hz.
 
-That topic is the single source of obstacle truth while the stack runs:
+While the stack runs, the obstacles are taken from this topic only:
 virtual_lidar.py and hit_monitor.py rebuild their rectangle lists from it,
-and RViz renders the same markers as boxes. With a static scenario (or none)
-the markers simply never move.
+and RViz draws the same markers as boxes. With a static scenario (or none)
+the markers do not move.
 """
 
 import math

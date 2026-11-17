@@ -14,7 +14,7 @@ What a ray can hit:
   the ground    the plane z = 0, seen only by rays pointing downwards
   other drones  passed in as small boxes, see drone_boxes()
 
-Rays are fixed in the world frame rather than rotated with the drone. Our
+Rays are fixed in the world frame instead of turning with the drone. The
 drones never change heading (the offboard setpoints hold it), so world and body
 frames are the same, and fixing the rays to the world removes any chance of a
 frame mismatch between the two simulators.

@@ -25,7 +25,7 @@ class DroneNav2Bridge(Node):
     def __init__(self):
         super().__init__("drone_nav2_bridge")
 
-        # Gazebo topic used by your X3 drone velocity controller.
+        # Gazebo topic used by the X3 drone velocity controller.
         self.gz_twist_topic = "/model/drone_1/gazebo/command/twist"
 
         # Enable topic for the multicopter controller.

@@ -1,0 +1,13 @@
+{
+  "n_azimuth": 16,
+  "elevations_deg": [
+    -60.0,
+    -30.0,
+    0.0,
+    30.0,
+    60.0
+  ],
+  "poles": true,
+  "max_range": 10.0,
+  "ground": true
+}

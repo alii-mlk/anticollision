@@ -118,10 +118,10 @@ def clear_obstacles(world):
 def spawn_obstacles(world, obstacles, sdf_dir):
     """Spawn each obstacle from an SDF file next to the scenario.
 
-    Two details matter here. The SDF is passed by filename rather than inline,
-    because an inline SDF would have to go into a protobuf text string, which
-    cannot contain the newlines an SDF document needs. And the files are kept
-    rather than written to a temporary directory: the create service returns as
+    The SDF is passed by filename instead of inline, because an inline SDF
+    would have to go into a protobuf text string, which cannot contain the
+    newlines an SDF document needs. The files are kept instead of being
+    written to a temporary directory: the create service returns as
     soon as the request is acknowledged, while Gazebo reads the file on a later
     update, so deleting the files right after the loop loses the last obstacle.
     """
@@ -185,8 +185,8 @@ def main():
                                    args.scenario / "obstacles")
 
     # Verify against the world itself. The create service acknowledges a
-    # request before Gazebo has actually built the entity, so an acknowledged
-    # spawn is not proof; poll until the world agrees or we give up.
+    # request before Gazebo has built the entity, so an acknowledged spawn
+    # proves nothing. Poll until the world agrees, or give up.
     present = 0
     for _ in range(10):
         present = len(existing_obstacle_names(args.world))

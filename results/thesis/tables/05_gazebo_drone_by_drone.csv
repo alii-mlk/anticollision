@@ -1,0 +1,10 @@
+comparison,drones,flights,arrived both ways,saved,lost,arrived neither way
+final policy against straight,1,25,10,15,0,0
+final policy against straight,2,50,26,24,0,0
+final policy against straight,3,75,38,34,0,3
+final policy against straight,1 to 3,150,74,73,0,3
+final policy against straight,4,100,49,44,0,7
+trained alone against straight,1,25,10,14,0,1
+trained alone against straight,2,50,26,21,0,3
+trained alone against straight,3,75,38,26,0,11
+trained alone against straight,1 to 3,150,74,61,0,15

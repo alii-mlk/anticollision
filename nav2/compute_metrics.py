@@ -14,7 +14,7 @@ Metrics per run:
   nav_time_s      last navigation_time in the feedback stream (sim seconds)
   path_len_m      integrated length of the flown trajectory (from feedback)
   euclid_m        straight-line start->goal distance (from scenario.yaml)
-  ratio           path_len / euclid  -- the professor's overhead metric
+  ratio           path_len / euclid, the overhead metric of the evaluation plan
   hits            contact episodes counted by hit_monitor
   min_clearance_m closest approach to any obstacle (negative = penetration)
 
@@ -154,8 +154,8 @@ def try_plots(rows, out_dir):
         print("(matplotlib not available -- skipping plots)")
         return
 
-    # X axis: obstacle speed when the batch sweeps speeds (Phase C),
-    # otherwise number of obstacles (Phase B).
+    # X axis: obstacle speed when the batch sweeps speeds (moving obstacles),
+    # otherwise number of obstacles (static obstacles).
     speeds = {r["obstacle_speed"] for r in rows}
     ns_set = {r["n_obstacles"] for r in rows if r["n_obstacles"] is not None}
     if len(speeds) > 1 and len(ns_set) <= 1:

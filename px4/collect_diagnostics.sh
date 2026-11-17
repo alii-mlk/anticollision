@@ -3,7 +3,7 @@
 # one file, logs/diagnostics.txt.
 #
 # Run it while the simulation is still up if you can: some of what it collects
-# (which processes are alive, whether each MAVROS is actually talking to its
+# (which processes are alive, whether each MAVROS is talking to its
 # autopilot) only exists while things are running. The log files it reads
 # survive either way.
 #

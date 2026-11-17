@@ -1,0 +1,22 @@
+crash diagnosis 2026-11-12 19:24:22
+policy /mnt/hgfs/thesis/anticollision/rl/runs/swarm_1/best.zip (mujoco), 82 rays, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+
+600 flights: {'reached': 556, 'collided': 42, 'out_of_bounds': 1, 'timeout': 1}
+42 ended against an obstacle
+
+where on the box:
+    face     17  (40%)
+    edge     22  (52%)
+    corner    3  (7%)
+    the top of the box was involved in 17 (40%), the others were on its sides
+    speed at the crash: median 1.03 m/s
+
+what the lidar showed of that box:
+    before the crash   crashes  true distance  rays on box  no ray  hidden > 0.35 m  median hidden
+    2 s                     42         2.05 m            6      0%              19%         0.13 m
+    1 s                     42         1.13 m           10      0%               2%         0.08 m
+    0.5 s                   42         0.69 m           12      0%               0%         0.03 m
+    last decision           42         0.37 m           15      0%               0%         0.02 m
+    (true distance: from the drone's centre to the box, median. hidden > 0.35 m:
+     the box was closer than the lidar showed by more than the drone's radius,
+     counting the crashes with no ray on the box)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Collision counter for the drone Nav2 evaluation.
 
-Per the evaluation protocol, the simulation is NOT stopped when the drone
-touches an obstacle; instead the number of hits is counted as an
+As in the evaluation protocol, the simulation is not stopped when the drone
+touches an obstacle. The number of hits is counted instead, as an
 effectiveness metric. This node subscribes to /odom, models the drone as a
 disc of radius `drone_radius`, and checks it against the obstacle
 rectangles each update:
@@ -78,8 +78,8 @@ class HitMonitor(Node):
         self.obstacles_sub = self.create_subscription(
             MarkerArray, "/obstacles", self.obstacles_callback, 10)
         # Reset (from the goal scripts, right before each goal) so hits are
-        # counted from navigation start -- a moving obstacle drifting over the
-        # PARKED drone before the goal is not a navigation failure.
+        # counted from the start of navigation. A moving obstacle drifting over
+        # the parked drone before the goal is sent is not a navigation failure.
         self.reset_sub = self.create_subscription(
             Empty, "/hit_monitor/reset", self.reset_callback, 10)
 
@@ -95,9 +95,9 @@ class HitMonitor(Node):
         self.hits = 0
         self.min_clearance = math.inf
         self.samples = 0
-        # Adopt (don't count) a contact that already exists at reset time: an
-        # obstacle sitting on the still-parked drone is an initial condition,
-        # not a navigation failure. Ignored until that contact first releases.
+        # A contact that already exists at reset time is not counted: an
+        # obstacle sitting on the parked drone is how the run started, and the
+        # drone did nothing wrong. It is ignored until that contact releases.
         self.adopting = True
         self.get_logger().info("Hit counters reset for the new navigation goal.")
         self.write_state()
@@ -118,9 +118,9 @@ class HitMonitor(Node):
         contact = clearance <= 0.0
 
         if self.adopting:
-            # Inherited pre-navigation contact: don't count it, don't let it
-            # poison min_clearance. Adoption ends when the contact releases
-            # (or immediately if there is none).
+            # Contact from before navigation: not counted and not used for
+            # min_clearance. This ends when the contact releases (or right
+            # away if there is none).
             if contact:
                 self.in_contact = True
                 return

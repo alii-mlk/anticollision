@@ -1,29 +1,24 @@
 __pycache__/
 *.pyc
 .DS_Store
+.vscode/
 
-# Raw run logs are regenerated on every run, and they get large (a single goal
-# log can be ~10 MB of feedback stream). Keep curated runs in results/ instead.
-nav2/logs/
-
-# Generated scenarios are fully reproducible from gen_scenario.py + seed.
-nav2/scenarios/
-
-# Batch evaluation output (large; promote citable batches to results/).
-nav2/runs/
-
-# Internal planning notes, not meant for the public repo.
+# My own planning notes.
 ROADMAP.md
+RELATED_WORK.md
 
-# PX4 stage logs (same policy as nav2/logs).
+# Logs, generated scenarios and batch output. They are large and can be made
+# again from the seeds. The runs used in the thesis are copied to results/.
+nav2/logs/
+nav2/scenarios/
+nav2/runs/
 px4/logs/
-
-# Generated 3D scenarios and run output, reproducible from seed.
 px4/scenarios3d/
 px4/runs/
 px4/runs3d/
 px4/runs_k2/
 
-# RL stage: logs, training runs and checkpoints are regenerated.
+# Training runs and their logs. The policies used in the thesis are copied to
+# results/<date>/model/.
 rl/logs/
 rl/runs/

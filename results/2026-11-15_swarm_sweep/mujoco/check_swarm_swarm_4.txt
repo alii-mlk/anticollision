@@ -1,0 +1,43 @@
+swarm checks 2026-11-15 18:10:33, mujoco flight model
+
+--- 1 one drone, against rl/env.py ---
+    identical to rl/env.py on 25/25 scenarios
+PASS  (7.1 s)
+
+--- 2 independence of the simulator instances ---
+    15/15 drones fly the same alone and in a group of three
+PASS  (4.2 s)
+
+--- 3 straight line with 2 and 3 drones, against Gazebo ---
+    k=2: same number of arrivals in 24/25 runs; drones reached: Gazebo 26, here 27 of 50; drones that hit another drone here: 0
+         differ: n8 s5 (Gazebo 1, here 2)
+    k=3: same number of arrivals in 23/25 runs; drones reached: Gazebo 38, here 39 of 75; drones that hit another drone here: 0
+         differ: n8 s5 (Gazebo 1, here 3), n20 s3 (Gazebo 3, here 2)
+PASS  (17.6 s)
+
+--- 4 the policy final.zip, together and alone ---
+    policy /mnt/hgfs/thesis/anticollision/rl/runs/swarm_4/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+      k  drones   Gazebo  together   alone   crashes together (obstacle / drone / other)
+      1      25       25        25      25   0 / 0 / 0
+      2      50       50        46      46   4 / 0 / 0
+      3      75       72        70      70   5 / 0 / 0
+    (columns Gazebo, together and alone: drones that reached their target)
+PASS  (77.0 s)
+
+--- 5 training side ---
+    scenes with [1, 2, 3] drones, 0 neighbours, 400 steps: 26 missions ended, 10 of them later missions
+    {'collided': 14, 'reached': 6, 'cut': 6}
+    1,368 decisions/s over 3 processes
+PASS  (1.9 s)
+
+--- 5 training side, with neighbour inputs ---
+    scenes with [2, 6] drones, 3 neighbours, 400 steps: 28 missions ended, 13 of them later missions
+    {'collided': 16, 'reached': 5, 'cut': 7}
+    1,008 decisions/s over 2 processes
+PASS  (3.3 s)
+
+--- 6 neighbour inputs ---
+    hand-worked cases and 500 random pairs agree
+PASS  (0.0 s)
+
+all checks passed

@@ -1,0 +1,15 @@
+drones,controller,flights,arrived,%,95% interval,hit obstacle,hit drone,other end
+1,straight,25,10,40.0,23.4 to 59.3,15,0,0
+1,trained alone,25,24,96.0,80.5 to 99.3,1,0,0
+1,final policy,25,25,100.0,86.7 to 100.0,0,0,0
+2,straight,50,26,52.0,38.5 to 65.2,23,1,0
+2,trained alone,50,47,94.0,83.8 to 97.9,3,0,0
+2,final policy,50,50,100.0,92.9 to 100.0,0,0,0
+3,straight,75,38,50.7,39.6 to 61.7,35,2,0
+3,trained alone,75,64,85.3,75.6 to 91.6,11,0,0
+3,final policy,75,72,96.0,88.9 to 98.6,3,0,0
+1 to 3,straight,150,74,49.3,41.4 to 57.3,73,3,0
+1 to 3,trained alone,150,135,90.0,84.2 to 93.8,15,0,0
+1 to 3,final policy,150,147,98.0,94.3 to 99.3,3,0,0
+4,straight,100,49,49.0,39.4 to 58.7,49,2,0
+4,final policy,100,93,93.0,86.3 to 96.6,7,0,0

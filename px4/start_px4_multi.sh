@@ -31,14 +31,14 @@ LOGDIR="$WORKDIR/logs"
 # the autopilot says so. That is fine for one vehicle, but with three PX4
 # instances the physics has to stay in step with all of them, the estimators
 # start missing sensor data ("Accel #0 fail: TIMEOUT", "Attitude failure"),
-# and the drones fall out of the sky. PX4 ships a nolockstep configuration for
-# exactly this case:
+# and the drones fall out of the sky. PX4 has a nolockstep configuration for
+# this case:
 #
 #   cd ~/px4/PX4-Autopilot && make px4_sitl_nolockstep
 #   PX4_BUILD=px4_sitl_nolockstep ./start_px4_multi.sh --scenario <dir>
 #
-# Without lockstep the simulation runs in real time and runs are no longer
-# bit-for-bit reproducible, which is the usual trade for multi-vehicle work.
+# Without lockstep the simulation runs in real time, and two runs of the same
+# scenario are no longer identical to the bit.
 PX4_BUILD="${PX4_BUILD:-px4_sitl_default}"
 
 if [ "${1:-}" != "--scenario" ] || [ -z "${2:-}" ]; then
@@ -127,10 +127,9 @@ open_term() {
 }
 
 # How long PX4 takes to come up depends on how fast the machine can run the
-# simulation, so wait for it to say it is ready rather than sleeping a fixed
-# number of seconds. On a machine simulating in slow motion any fixed guess is
-# wrong, and starting the next instance too early is what turns a slow machine
-# into a broken one.
+# simulation, so wait for it to say it is ready instead of sleeping a fixed
+# number of seconds. On a slow machine any fixed wait is wrong, and starting
+# the next instance too early breaks the startup.
 wait_for_px4() {
   local i="$1"
   local limit="${PX4_READY_TIMEOUT:-240}"
@@ -164,8 +163,8 @@ for ((i = 0; i < K; i++)); do
 
   # Every instance otherwise starts a uXRCE-DDS client on the same port 8888,
   # which floods the logs with "Exception sending a multicast message" and
-  # wastes CPU. We reach PX4 over MAVLink/MAVROS, not uXRCE-DDS, so give each
-  # instance its own port to keep them from colliding.
+  # wastes CPU. This project talks to PX4 over MAVLink and does not use
+  # uXRCE-DDS, so each instance just gets its own port.
   DDS_PORT=$((8888 + i))
 
   open_term "PX4 instance $i" "
@@ -175,10 +174,9 @@ for ((i = 0; i < K; i++)); do
     HEADLESS=$HEADLESS stdbuf -oL -eL ./build/$PX4_BUILD/bin/px4 -i $i
   "
 
-  # The heartbeat starts before we wait for the instance, not after. PX4 will
-  # not report "Ready for takeoff" while its arming checks are still saying
-  # "No connection to the GCS", so waiting first means waiting for something
-  # only this heartbeat can bring about.
+  # The heartbeat has to start before waiting for the instance. PX4 does not
+  # report "Ready for takeoff" while its arming checks still say "No
+  # connection to the GCS", and only the heartbeat can fix that.
   # The heartbeat also applies the SITL parameters, over the same MAVLink
   # connection. MAVROS did this before, but it downloads the autopilot's whole
   # parameter list first, and with several instances that download does not
@@ -186,8 +184,8 @@ for ((i = 0; i < K; i++)); do
   #
   # SDLOG_MODE=-1 switches PX4's own flight logs off. Each instance writes 40
   # to 60 MB of them per flight, which over two 75-run sweeps is about 15 GB
-  # into the VM's disk and through it the Mac's, and none of our results come
-  # from them. PX4 reads this at boot and keeps parameters per instance, so it
+  # into the VM's disk and through it the Mac's, and none of the results use
+  # them. PX4 reads this at boot and keeps parameters per instance, so it
   # takes effect from the next start onwards.
   GCS_PORT=$((18570 + i))
   ( cd "$WORKDIR" && python3 gcs_heartbeat.py --port "$GCS_PORT" \
@@ -226,8 +224,8 @@ wait_for_mavros() {
       esac
       return 0
     fi
-    # A parameter MAVROS does not declare is a startup error, not a warning,
-    # and the node never comes up at all. Say so instead of waiting it out.
+    # MAVROS treats a parameter it does not know as a startup error and the
+    # node never comes up, so report it instead of waiting.
     if grep -qiE "not declared|InvalidParameter|ParameterNotDeclared" "$log" 2>/dev/null; then
       echo "    ERROR: MAVROS rejected one of its parameters:"
       grep -iE "not declared|InvalidParameter|ParameterNotDeclared" "$log" | tail -n 2
@@ -245,13 +243,12 @@ echo "Starting one MAVROS per drone ..."
 # PX4 gives instance i the MAVLink system ID i+1, while MAVROS addresses
 # system 1 unless it is told otherwise. Left at the default, all k MAVROS
 # nodes talk to system 1: instance 0 answers, and every other instance logs
-# "Ignore command 400 from 1/191 to 1/1" and its drone can never arm. Worse,
+# "Ignore command 400 from 1/191 to 1/1" and its drone can never arm. Also,
 # the unanswered commands get retried until two acknowledgements race and
 # MAVROS aborts with "Promise already satisfied". So each MAVROS is given its
 # own autopilot's system ID.
 #
-# The denied plugins are not used here and they are not idle either.
-# guided_target logs "PositionTargetGlobal failed because no origin" many
+# The denied plugins are not used here, and they cost CPU: guided_target logs "PositionTargetGlobal failed because no origin" many
 # times per second, and waypoint, rallypoint and geofence keep asking the
 # autopilot for lists. Disabling them cut each MAVROS from about 65% of a core
 # to about 47%.
@@ -282,8 +279,8 @@ done
 echo ""
 echo "Bridging Gazebo's clock into ROS ..."
 # The mission runner measures simulation time from /clock. Wall-clock time
-# stops being a usable substitute as soon as the machine cannot simulate every
-# drone at full speed, which is exactly the case this script exists for.
+# cannot be used instead as soon as the machine cannot simulate every drone at
+# full speed, which is the case this script is for.
 ( source /opt/ros/jazzy/setup.bash &&
   ros2 run ros_gz_bridge parameter_bridge \
     "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock" ) \
@@ -333,8 +330,8 @@ echo " READY. All $K drone(s) are up and their parameters are applied."
 echo " Do not start the mission before this line appears."
 echo "================================================================"
 echo ""
-# How fast the simulation is actually running decides whether this many drones
-# are viable on this machine at all, so measure it rather than assume it.
+# The real time factor decides whether this many drones can run on this
+# machine, so it is measured here.
 "$WORKDIR/sim_speed.py" --window 8 || true
 echo ""
 echo "Check that each MAVROS connected:"

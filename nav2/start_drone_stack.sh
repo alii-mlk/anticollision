@@ -131,6 +131,6 @@ echo "  ./launch_nav2.sh        # start Nav2, wait for 'Managed nodes are active
 echo "  ./send_nav2_goal.sh     # send goal (8,0); or: ./send_nav2_goal.sh X Y"
 echo "Optional:"
 echo "  ./view.sh               # RViz: costmap, path, lidar, odom trail"
-echo "  ./view_gazebo.sh        # Gazebo GUI (needs 3D accel OFF in VMware)"
+echo "  ./view_gazebo.sh        # Gazebo GUI (needs 3D acceleration off in VMware)"
 echo "  ./test_move_drone.sh    # manual /cmd_vel sanity check, bypasses Nav2"
 echo "To stop everything: ./stop_drone_stack.sh"

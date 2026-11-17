@@ -2,12 +2,12 @@
 """Random scenario generator for the drone Nav2 evaluation.
 
 Picks a random start point, a random goal point, and N randomly placed
-axis-aligned box obstacles, then writes BOTH artifacts from this single
-source so they can never disagree:
+axis-aligned box obstacles, then writes both files from the same data, so
+they always agree:
 
-  <out>/world.sdf       -- Gazebo world (obstacles + drone spawned at start)
-  <out>/scenario.yaml   -- machine-readable scenario (read by virtual_lidar.py,
-                           hit_monitor.py, send_nav2_goal.sh, batch tooling)
+  <out>/world.sdf       Gazebo world (obstacles + drone spawned at start)
+  <out>/scenario.yaml   the scenario as data (read by virtual_lidar.py,
+                        hit_monitor.py, send_nav2_goal.sh and the batch scripts)
 
 Usage:
   ./gen_scenario.py --n-obstacles 4 --seed 42
@@ -16,14 +16,14 @@ Usage:
 
 With --obstacle-speed > 0 each obstacle gets a random direction at that speed
 (bouncing off the workspace bounds; motion is integrated by obstacle_mover.py).
-Moving obstacles are NOT placed in the Gazebo world: the whole sensing chain
-(virtual lidar, hit monitor) tracks the moving ground truth published on
-/obstacles, and a physical model frozen at its spawn pose would let the drone
-crash into a position the obstacle has virtually left. RViz shows the moving
-boxes via the /obstacles markers.
+Moving obstacles are not put into the Gazebo world. The virtual lidar and the
+hit monitor follow the moving obstacles published on /obstacles, and a box
+frozen at its spawn pose in Gazebo would let the drone crash into a place the
+obstacle has already left. RViz shows the moving boxes with the /obstacles
+markers.
 
-No third-party dependencies (YAML is written directly); safe to run on any
-machine with Python 3.
+Needs only the standard library (the YAML is written by hand), so it runs on
+any machine with Python 3.
 
 Limitations (kept in sync with virtual_lidar.py / hit_monitor.py):
 obstacles are axis-aligned boxes, tall enough to intersect the flight
@@ -39,7 +39,7 @@ from pathlib import Path
 # Workspace and placement rules. Global costmap covers [-15,15]^2, so keep
 # everything comfortably inside it.
 BOUNDS = 9.0                 # scenario elements within [-BOUNDS, BOUNDS]^2
-MIN_START_GOAL_DIST = 8.0    # professor's metric needs a meaningful flight
+MIN_START_GOAL_DIST = 8.0    # the ratio metric needs a long enough flight
 CLEAR_RADIUS = 1.8           # obstacle-free zone around start and goal
 OBSTACLE_GAP = 0.4           # minimum gap between obstacles
 SIZE_X = (0.5, 2.0)          # obstacle footprint size ranges (m)
@@ -50,7 +50,7 @@ MAX_TRIES = 2000
 
 
 def rect_circle_clear(rect, cx, cy, radius):
-    """True if circle (cx,cy,radius) does NOT touch rect (x0,x1,y0,y1)."""
+    """True if circle (cx,cy,radius) does not touch rect (x0,x1,y0,y1)."""
     x0, x1, y0, y1 = rect
     nx = min(max(cx, x0), x1)
     ny = min(max(cy, y0), y1)
@@ -165,8 +165,8 @@ def world_sdf(start, obstacles, moving):
 <sdf version="1.6">
   <world name="drone_nav2_world">
 
-    <!-- 2 ms steps: half the CPU cost of the original 1 ms; still plenty
-         for the multicopter controller. Keeps the starved VM responsive. -->
+    <!-- 2 ms steps: half the CPU cost of the original 1 ms, still enough
+         for the multicopter controller. Keeps the VM responsive. -->
     <physics name="2ms" type="ignored">
       <max_step_size>0.002</max_step_size>
       <real_time_factor>1.0</real_time_factor>

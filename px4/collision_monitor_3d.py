@@ -6,8 +6,7 @@ counted and allowed to continue, so on contact this node disarms the vehicle
 through MAVROS. The drone drops where it was hit and stays there, which also
 leaves it as an obstacle for the other drones in the multi-drone phase.
 
-Frames matter here. Obstacles in scenario.yaml are in Gazebo world
-coordinates, while MAVROS reports the drone in PX4's local frame, whose origin
+Obstacles in scenario.yaml are in Gazebo world coordinates, while MAVROS reports the drone in PX4's local frame, whose origin
 is the drone's spawn point. This node converts local to world by adding the
 drone's start position from the scenario:
 
@@ -34,7 +33,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
-from geometry_msgs.msg import PointStamped, PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, TwistStamped
 from std_msgs.msg import Bool
 from mavros_msgs.srv import CommandBool, CommandLong
 
@@ -42,12 +41,15 @@ from mavros_ns import resolve as resolve_mavros
 
 # PX4 refuses a normal disarm while the vehicle is airborne ("Disarming
 # denied: not landed"). MAV_CMD_COMPONENT_ARM_DISARM with this magic value in
-# param2 forces it, which is what "destroyed" needs to mean here.
+# param2 forces it, which is what destroying the drone means here.
 MAV_CMD_COMPONENT_ARM_DISARM = 400
 FORCE_DISARM_MAGIC = 21196.0
 
 DRONE_RADIUS = 0.35        # x500 is roughly 0.5 m across; be slightly generous
 CHECK_RATE_HZ = 20.0
+# Below this height a drone is on the ground (before takeoff, after landing at
+# its target, or a wreck), and is left out of the distance between drones.
+AIRBORNE_Z = 1.0
 
 
 def parse_scenario(path):
@@ -125,6 +127,15 @@ class CollisionMonitor3D(Node):
         # hazard for the others.
         self.world_pos_pub = self.create_publisher(
             PointStamped, f"/drone_world_position/drone{drone_id}", 10)
+        # The drone's velocity goes out next to its position, for the
+        # avoidance policy of the other drones (it predicts where a neighbour
+        # is heading). The local frame's axes are the world's, so the velocity
+        # MAVROS reports needs no conversion.
+        self.world_vel_pub = self.create_publisher(
+            TwistStamped, f"/drone_world_velocity/drone{drone_id}", 10)
+        self.create_subscription(
+            TwistStamped, f"{ns}/local_position/velocity_local",
+            self.velocity_cb, sensor_qos)
         for other in range(len(drones)):
             if other == drone_id:
                 continue
@@ -134,6 +145,12 @@ class CollisionMonitor3D(Node):
 
         self.world_pos = None
         self.min_clearance = math.inf
+        # Closest distance between this drone's centre and another drone's,
+        # both in the air. The monitors see each other's live positions, so
+        # this is measured at the same moment for both drones, which the
+        # mission nodes' tracks are not: each counts its time from its own
+        # start.
+        self.min_drone_distance = math.inf
         self.destroyed = False
         self.destroyed_at = None
         self.collided_with = None
@@ -155,6 +172,13 @@ class CollisionMonitor3D(Node):
             self.other_positions[other_id] = (msg.point.x, msg.point.y,
                                               msg.point.z)
         return cb
+
+    def velocity_cb(self, msg):
+        out = TwistStamped()
+        out.header.stamp = self.get_clock().now().to_msg()
+        out.header.frame_id = "world"
+        out.twist.linear = msg.twist.linear
+        self.world_vel_pub.publish(out)
 
     def mission_done_cb(self, msg):
         if msg.data and not self.mission_done:
@@ -197,6 +221,12 @@ class CollisionMonitor3D(Node):
 
         clearance = min(obstacle_clearance, drone_clearance)
         self.min_clearance = min(self.min_clearance, clearance)
+
+        if wz > AIRBORNE_Z:
+            self.min_drone_distance = min(
+                [self.min_drone_distance]
+                + [math.dist((wx, wy, wz), q) for q in self.other_positions.values()
+                   if q[2] > AIRBORNE_Z])
 
         if clearance <= 0.0:
             kind = ("another drone" if drone_clearance <= obstacle_clearance
@@ -250,9 +280,12 @@ class CollisionMonitor3D(Node):
             return
         clearance = ("null" if math.isinf(self.min_clearance)
                      else f"{self.min_clearance:.3f}")
+        drone_distance = ("null" if math.isinf(self.min_drone_distance)
+                          else f"{self.min_drone_distance:.3f}")
         lines = [
             f"destroyed: {str(self.destroyed).lower()}",
             f"min_clearance: {clearance}",
+            f"min_drone_distance: {drone_distance}",
             f"samples: {self.samples}",
         ]
         if self.world_pos:

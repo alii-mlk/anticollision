@@ -38,23 +38,29 @@ Closest approach to an obstacle, drones that arrived
 
 Closest approach between drones in the air, runs with k > 1
 
-  straight 50 runs, under 1 m: 3, under 2 m: 4, closest: n8_k2_s5 0.62 m, n4_k2_s5 0.72 m, n8_k3_s5 0.81 m
-  policy   50 runs, under 1 m: 0, under 2 m: 0, closest: n12_k3_s1 2.66 m, n20_k3_s1 2.68 m, n8_k3_s1 2.75 m
+  straight 50 runs, drones destroyed by touching another drone: 3, closest: n4_k2_s5 at least 0.33 m, n4_k3_s5 at least 0.39 m, n8_k2_s5 at least 0.55 m
+  policy   50 runs, drones destroyed by touching another drone: 0, closest: n8_k2_s5 at least 1.97 m, n4_k3_s5 at least 1.98 m, n8_k3_s5 at least 2.00 m
+
+  These runs did not record when each drone's clock started (each
+  mission node counts from its own start, up to about a second apart),
+  so the distances are lower bounds: the closest the two drones could
+  have been for any offset between their clocks up to 2 s.
+  Contacts are counted by the collision monitor from live positions.
 
 Crashes under the policy, nearest other drone in the last 5 s before the crash
 
-  n12_k2_s5   drone 0  at  16.1 s  hit an obstacle  5.5 m (drone 1)
-  n12_k3_s2   drone 0  at  33.1 s  hit an obstacle  17.0 m (drone 2)
-  n12_k3_s5   drone 0  at  16.8 s  hit an obstacle  5.7 m (drone 1)
-  n16_k3_s1   drone 0  at  26.4 s  hit an obstacle  8.6 m (drone 1)
-  n16_k3_s1   drone 2  at  14.9 s  hit an obstacle  2.8 m (drone 1)
-  n16_k3_s2   drone 0  at  34.1 s  hit an obstacle  no other drone airborne
-  n16_k3_s2   drone 1  at  13.7 s  hit an obstacle  6.7 m (drone 2)
-  n20_k2_s2   drone 1  at  13.6 s  hit an obstacle  8.5 m (drone 0)
-  n20_k3_s1   drone 0  at  26.0 s  hit an obstacle  8.4 m (drone 2)
-  n20_k3_s2   drone 0  at  33.4 s  hit an obstacle  17.9 m (drone 2)
-  n20_k3_s2   drone 1  at  13.8 s  hit an obstacle  7.2 m (drone 2)
-  n20_k3_s5   drone 2  at  20.1 s  hit an obstacle  9.0 m (drone 0)
+  n12_k2_s5   drone 0  at  16.1 s  hit an obstacle  at least 4.2 m (drone 1)
+  n12_k3_s2   drone 0  at  33.1 s  hit an obstacle  at least 16.4 m (drone 2)
+  n12_k3_s5   drone 0  at  16.8 s  hit an obstacle  at least 4.2 m (drone 1)
+  n16_k3_s1   drone 0  at  26.4 s  hit an obstacle  at least 7.2 m (drone 1)
+  n16_k3_s1   drone 2  at  14.9 s  hit an obstacle  at least 2.5 m (drone 1)
+  n16_k3_s2   drone 0  at  34.1 s  hit an obstacle  at least 17.4 m (drone 2)
+  n16_k3_s2   drone 1  at  13.7 s  hit an obstacle  at least 6.3 m (drone 2)
+  n20_k2_s2   drone 1  at  13.6 s  hit an obstacle  at least 7.1 m (drone 0)
+  n20_k3_s1   drone 0  at  26.0 s  hit an obstacle  at least 7.7 m (drone 1)
+  n20_k3_s2   drone 0  at  33.4 s  hit an obstacle  at least 17.2 m (drone 2)
+  n20_k3_s2   drone 1  at  13.8 s  hit an obstacle  at least 6.5 m (drone 2)
+  n20_k3_s5   drone 2  at  20.1 s  hit an obstacle  at least 8.9 m (drone 0)
   n4_k1_s2    drone 0  at  26.6 s  hit an obstacle  flying alone
-  n4_k3_s4    drone 0  at  20.8 s  hit an obstacle  3.8 m (drone 1)
-  n8_k2_s4    drone 1  at  12.2 s  hit an obstacle  9.6 m (drone 0)
+  n4_k3_s4    drone 0  at  20.8 s  hit an obstacle  at least 2.8 m (drone 1)
+  n8_k2_s4    drone 1  at  12.2 s  hit an obstacle  at least 9.4 m (drone 0)

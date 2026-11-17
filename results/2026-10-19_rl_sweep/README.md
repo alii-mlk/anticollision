@@ -1,6 +1,6 @@
 # 3D (n, k) sweep with and without the RL policy (2026-10-19)
 
-The same 75 runs as the September baseline (n in {4, 8, 12, 16, 20} obstacles,
+Stage 3, the first avoidance policy. The same 75 runs as the September baseline (n in {4, 8, 12, 16, 20} obstacles,
 k in {1, 2, 3} drones, seeds 1 to 5), flown twice on the same day with the same
 software: once straight at the target as before, and once with every drone
 steered by the trained policy. Both use the same scenarios, the same mission
@@ -30,9 +30,12 @@ python3 compare_sweeps_3d.py runs3d/<straight batch> runs3d/<policy batch>
     --policy ../results/2026-10-19_rl_sweep/model
 ```
 
-`straight/` and `policy/` hold each sweep's metrics.csv and summary.txt in the
-same format as the September folder. `comparison.txt` is the full output of
-`compare_sweeps_3d.py`.
+`straight/` and `policy/` hold each sweep's metrics.csv (one row per run),
+drones.csv (one row per drone) and summary.txt. `comparison.txt` is the full
+output of `compare_sweeps_3d.py`, `separation.csv` the closest distance
+between drones per run (lower bounds, see below), and
+`evaluate_mujoco_1.txt` the policy flown in MuJoCo on the 25 single-drone
+scenarios (`rl/evaluate.py`).
 
 ## The baseline was re-run first
 
@@ -78,9 +81,14 @@ With the policy it is between 1.13 and 1.34 and grows with the number of
 obstacles, because the drones now fly around the obstacles instead of straight
 at the target.
 
-Drone to drone collisions go from 3 to 0. Flying straight, three runs had two
-drones pass within 1 m of each other in the air. With the policy no two drones
-came closer than 2.66 m in any of the 50 multi-drone runs.
+Drone to drone collisions go from 3 to 0. The distance between two drones can
+only be given as a lower bound. Each drone's track counts time from the start
+of its own mission node, the nodes of a run start up to about a second apart,
+and these runs did not record when. Allowing the two clocks to be up to 2 s
+apart, no two drones flying with the policy came closer than 1.97 m in any of
+the 50 multi-drone runs. An earlier version of this file said 2.66 m, from
+matching the tracks as if their clocks had started together. Newer runs record
+the distance in the collision monitors, which compare live positions.
 
 The result in Gazebo matches what MuJoCo predicted for the 25 single-drone
 scenarios (`rl/evaluate.py`): MuJoCo said 23 of 25, Gazebo gave 24 of 25. The
@@ -91,15 +99,16 @@ a millimetre in Gazebo.
 ## Costs
 
 The missions take longer: about 30 s of simulated time instead of 11 to 12 s.
-The detours add a little, but most of the difference is the speed. The policy
-flies at the 1.04 m/s it was trained at, while PX4's position controller
-averaged 1.70 m/s on the same drones flying straight. The training speed was
-set by calibrating the MuJoCo controller (`rl/check_env.py`). A faster policy
-should be possible, but it would have to be trained again.
+This is mostly because of the speed and only a little because of the detours.
+The policy flies at the 1.04 m/s it was trained at, while PX4's position
+controller averaged 1.70 m/s on the same drones flying straight. The training
+speed came from calibrating the MuJoCo controller (`rl/check_env.py`). A
+faster policy should be possible, but it would have to be trained again.
 
-The controller's own CPU time (lidar plus network, every 0.104 s) is 3.1 to
-3.9 s per mission with one drone and 13 to 20 s per run with three, against
-about 1 s per drone for the straight-line mission node. The total CPU time per
+The controller's own CPU time (lidar plus network, every 0.104 s) is on
+average 3.1 to 3.9 s per mission with one drone and 13 to 20 s per run with
+three, depending on the number of obstacles, against about 1 s per drone for
+the straight-line mission node. The total CPU time per
 run is 2 to 3 times the baseline, mostly because the runs last longer. The
 real time factor stayed between 0.94 and 1.00 in every run, so the VM kept up
 with three drones and their policies.
@@ -117,17 +126,25 @@ Destroyed drones by number of drones in the run:
 Flying straight, the crash rate does not depend on k. With the policy it rises
 at k = 3. All 15 crashes are obstacle hits, at 4 to 7 m altitude, and none
 happened with another drone close by. Of the 14 crashes in runs with more than
-one drone, the nearest other drone in the 5 s before the crash was 2.8 m away
-once, 3.8 m once, and 5.5 m or more (or not in the air) in the other twelve.
+one drone, the nearest other drone in the 5 s before the crash was at least
+2.5 m away once, at least 2.8 m once, and at least 4.2 m in the other twelve
+(lower bounds, for the reason given above).
 
-There are two possible reasons, and this data does not separate them. The
+There are two possible reasons, and this data cannot tell them apart. The
 first is that the k = 3 mazes are a different set of mazes: the generator
 places the obstacles after all k start and target points, so the same seed
 gives other obstacles for a different k. The second is that the policy was
-trained alone. In the k = 3 runs another drone was within the 10 m lidar range
-for 72% of the time in the air, which is an input the policy never saw in
+trained alone. In the k = 3 runs another drone (flying, landed or a wreck) was
+within the 10 m lidar range for 72% of the time in the air, which is an input the policy never saw in
 training, even when the other drone is too far away to matter. Flying the
 k = 3 scenarios in MuJoCo with each drone alone would tell the two apart.
+
+This was done later (`rl/check_swarm.py`, report in
+`results/2026-11-15_swarm_sweep/mujoco/check_swarm_mujoco_1.txt`): in MuJoCo
+the policy reaches 23,
+47 and 64 drones for k = 1, 2, 3 whether the drones fly together or each
+alone, against 24, 47 and 64 in Gazebo. So it was the first reason, the
+mazes.
 
 Clearance to obstacles, over the drones that arrived:
 
@@ -142,6 +159,6 @@ distance from the obstacles than flying straight. The drones it saves pass much
 closer: more than half come within 0.5 m of an obstacle, and two within a
 centimetre. In training the penalty for being within 1 m of an obstacle is
 small: it grows quadratically to at most 0.1 per decision at zero clearance,
-and is 0.025 at 0.5 m, against 10 for a crash. So the policy learned to get
-through gaps rather than to keep away from walls. Raising that penalty is the
-first thing to try if larger margins are wanted.
+and is 0.025 at 0.5 m, against 10 for a crash. So the policy learned to go
+through gaps instead of keeping away from walls. The next policy was trained
+with a five times larger penalty (`results/2026-11-15_swarm_sweep/`).

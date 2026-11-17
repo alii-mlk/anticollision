@@ -55,7 +55,7 @@ echo "=== 2b. MuJoCo, Gymnasium, Stable-Baselines3 ==="
 pip install mujoco gymnasium stable-baselines3
 
 # Stable-Baselines3 depends on torch; make sure that did not swap the CPU
-# build back for the CUDA one. This is the check that matters: torch itself
+# build back for the CUDA one. The important check: torch itself
 # must be the CPU build and must import.
 if ! python -c "import torch, sys; sys.exit(0 if torch.version.cuda is None else 1)"; then
   echo "  ERROR: torch is the CUDA build, or does not import"
@@ -66,7 +66,7 @@ python -c "import torch; print('  torch', torch.__version__, '| cuda build:', to
 
 # A stray NVIDIA library is a waste of disk rather than a fault, since the CPU
 # build of torch never loads one. Report what pulled each one in, so it can be
-# removed if nothing actually needs it.
+# removed if nothing needs it.
 stray="$(pip list --format=freeze 2>/dev/null | grep -iE '^nvidia-' | cut -d= -f1)"
 if [ -n "$stray" ]; then
   echo "  note: NVIDIA libraries still installed (harmless, not loaded):"

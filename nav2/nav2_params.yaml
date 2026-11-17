@@ -25,8 +25,7 @@ controller_server:
       stateful: True
 
     # Holonomic DWB: non-zero min/max_vel_y lets the planner sample sideways
-    # motion instead of only forward+turn, which is what the drone can
-    # actually do (it can strafe).
+    # motion instead of only forward+turn, since the drone can strafe.
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: True
@@ -35,8 +34,8 @@ controller_server:
       max_vel_x: 0.6
       max_vel_y: 0.4
       # Zero yaw rate: commanding the X3 to yaw (weak yaw authority) stalls
-      # its velocity controller entirely -- empirically, a cmd_vel with
-      # wz=-1.0 produces no motion at all while pure translation works.
+      # its velocity controller completely. In tests a cmd_vel with
+      # wz=-1.0 gave no motion at all, while pure translation works.
       # The drone is holonomic in x/y and never needs to rotate.
       max_vel_theta: 0.0
       min_speed_xy: 0.0
@@ -59,7 +58,7 @@ controller_server:
       trans_stopped_velocity: 0.1
       short_circuit_trajectory_evaluation: True
       stateful: True
-      # No PathAlign/GoalAlign: they score the robot's HEADING against the
+      # No PathAlign/GoalAlign: they score the robot's heading against the
       # path, which forces rotate-before-translate behavior. The multicopter
       # has weak yaw authority and doesn't need to face its direction of
       # travel, so heading critics stall it on lateral paths; PathDist and
@@ -172,7 +171,7 @@ bt_navigator:
     global_frame: map
     robot_base_frame: base_link
     odom_topic: /odom
-    # Generous IPC timeouts: on the loaded VM, action-server acknowledgments
+    # Long IPC timeouts: on the loaded VM, action-server acknowledgments
     # can lag; the 20 ms default caused spurious "Timed out waiting for action
     # server" aborts in batch runs (the only failure mode observed).
     default_server_timeout: 200

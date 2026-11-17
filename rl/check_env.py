@@ -2,7 +2,7 @@
 """Checks for rl/env.py, run for both flight models.
 
   1. check_env      Stable-Baselines3's own checker for the Gymnasium interface
-  2. calibration    how the drone actually flies for a given action: drift
+  2. calibration    how the drone flies for a given action: drift
                     while hovering, speed and height loss flying level, climb
                     rate. In MuJoCo these come from the package's controller,
                     so they have to be measured, not assumed.
@@ -197,10 +197,10 @@ def run_checks(name, episodes):
     ]
     for title, fn in steps:
         say(f"--- {title} ---")
-        start = time.time()
+        start = time.monotonic()
         try:
             fn()
-            say(f"PASS  ({time.time() - start:.1f} s)")
+            say(f"PASS  ({time.monotonic() - start:.1f} s)")
         except Exception:
             failed.append(f"{name}: {title}")
             for line in traceback.format_exc().strip().splitlines()[-6:]:

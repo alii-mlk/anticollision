@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import math
 import re
 import signal
@@ -37,13 +38,12 @@ def wait_for_stack(scenario, timeout=600.0):
     parameter back from each autopilot) prints nothing for most of that time.
     Flying before it finishes looks like it works: the drones arm and take off,
     then the battery failsafe lands them mid-mission because SIM_BAT_MIN_PCT
-    was applied too late. The run is wasted and the cause is not obvious from
-    the results, so refuse to start rather than produce numbers that mean
-    nothing.
+    was applied too late. The run is wasted and the results do not show why,
+    so it refuses to start instead.
     """
-    deadline = time.time() + timeout
+    deadline = time.monotonic() + timeout
     announced = False
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         if READY_MARKER.exists():
             marker = READY_MARKER.read_text()
             if str(scenario) in marker:
@@ -106,10 +106,10 @@ def main():
     if args.policy is not None:
         # The missions run with this same interpreter, so check here, once,
         # rather than have every drone fail on its own.
-        try:
-            import stable_baselines3  # noqa: F401
-            import torch  # noqa: F401
-        except ImportError:
+        # Only looked up with find_spec. Importing them here would load PyTorch
+        # (about 300 MB) into this process, which only waits.
+        if (importlib.util.find_spec("stable_baselines3") is None
+                or importlib.util.find_spec("torch") is None):
             sys.exit("--policy needs the RL venv. Run  source rl/env.sh  first.")
         args.policy = args.policy.expanduser().resolve()
         if not args.policy.exists():
@@ -142,11 +142,11 @@ def main():
     print()
 
     monitors, missions, out_dirs = [], [], []
-    started = time.time()
+    started = time.monotonic()
 
     # Results from a previous run of the same scenario are removed first. A
     # drone that fails to start writes nothing, and the aggregation below would
-    # then happily read the last run's numbers and report them as this run's.
+    # then read the last run's numbers and report them as this run's.
     for stale in list(out_root.glob("drone*/*.yaml")) + [out_root / "summary.yaml"]:
         stale.unlink(missing_ok=True)
 
@@ -214,7 +214,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
 
-    wall_time = time.time() - started
+    wall_time = time.monotonic() - started
 
     # --- aggregate ---
     rows = []
@@ -240,12 +240,11 @@ def main():
     reached = sum(1 for r in rows if r["outcome"] == "reached")
     ratio = (total_travelled / total_euclid) if total_euclid > 0 else 0.0
 
-    # The ratio above is over every drone, which is the metric as specified,
-    # but on its own it misleads once drones start colliding: a destroyed drone
-    # contributes the distance it managed against the full distance it was
-    # asked to cover, so the ratio drops below 1 and reads like a shortcut.
-    # This second ratio covers only the drones that actually arrived, and is
-    # the one that says how efficient a completed path was.
+    # The ratio above is over every drone, as in the evaluation plan. A
+    # destroyed drone counts the distance it managed against the full distance
+    # it was asked to fly, so with collisions that ratio drops below 1. This
+    # second ratio is over the drones that arrived, and shows how long a
+    # completed path was.
     arrived = [r for r in rows if r["outcome"] == "reached"]
     euclid_arrived = sum(r["euclidean"] for r in arrived)
     ratio_reached = (sum(r["travelled"] for r in arrived) / euclid_arrived
@@ -255,9 +254,9 @@ def main():
     hit_obstacle = sum(1 for r in rows if r["collided_with"] == "an obstacle")
 
     # The run lasts as long as its slowest drone, so that is the run's
-    # simulation time. Comparing it against the wall clock gives the real time
-    # factor the machine actually achieved, which is the number that says
-    # whether this many drones can be simulated here at full speed.
+    # simulation time. Divided by the wall-clock time it gives the real time
+    # factor, which shows whether this many drones can be simulated here at
+    # full speed.
     sim_time = max((r["time"] for r in rows), default=0.0)
     # Processor time of the mission nodes themselves, i.e. the controller:
     # negligible flying straight, the neural network's cost with the policy.
