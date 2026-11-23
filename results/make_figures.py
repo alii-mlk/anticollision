@@ -8,9 +8,8 @@ Stable-Baselines3). In the VM, from the repository root:
   python results/make_figures.py
 
 Writes every figure as PDF (for the thesis) and PNG (to look at) into
-results/thesis/figures/. The data is read with the functions of
-make_tables.py, and every figure has a table with the same numbers in
-results/thesis/tables.txt:
+results/figures/. The data is read with the functions of make_tables.py, and
+every figure has a table with the same numbers in results/tables/:
 
   01 learning curve                  table 1
   02 Gazebo arrivals by obstacles    tables 2 and 3
@@ -20,10 +19,16 @@ results/thesis/tables.txt:
   06 processor time                  table 11
   07 memory                          table 12
   08 one scenario seen from above    (the paths are in examples/)
+  09 arrived, crashed and timed out
+     with the safety layer           tables 15 and 17
+  10 one drone flown three ways      (stage 5 examples/)
 
-The three controllers have the same colour and marker in every figure. The
-colours were checked for colour-blind readers, and the markers tell the
-controllers apart in grey print.
+Every controller has the same colour and marker in every figure. The colours
+were checked for colour-blind readers, and the markers tell the controllers
+apart in grey print. Figures 9 and 10 add the two stage 5 controllers in the
+next colours of the same palette; their colours are close for some colour-
+blind readers, so they also have their own markers and every figure has its
+legend and its table.
 """
 
 import csv
@@ -40,19 +45,28 @@ from matplotlib.patches import Patch, Rectangle  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+# No __pycache__ folder next to the results.
+sys.dont_write_bytecode = True
 import make_tables as data  # noqa: E402
 
-OUT = data.OUT / "figures"
+OUT = HERE / "figures"
 EXAMPLE = data.NOVEMBER / "examples" / "n12_k3_s2"
 EXAMPLE_RUN = "n12_k3_s2"
 
 CONTROLLERS = ("straight", "trained alone", "final policy")
+SAFETY_CONTROLLERS = ("final policy", "with layer", "with layer and recovery")
 COLOR = {"straight": "#2a78d6", "trained alone": "#eb6834",
-         "final policy": "#1baf7a"}
-MARKER = {"straight": "o", "trained alone": "s", "final policy": "^"}
+         "final policy": "#1baf7a", "with layer": "#eda100",
+         "with layer and recovery": "#e87ba4"}
+MARKER = {"straight": "o", "trained alone": "s", "final policy": "^",
+          "with layer": "D", "with layer and recovery": "P"}
 # Small sideways shifts so the points of the three controllers do not hide
 # each other, as a fraction of the distance between two x values.
 SHIFT = {"straight": -0.12, "trained alone": 0.0, "final policy": 0.12}
+SAFETY_SHIFT = {"final policy": -0.12, "with layer": 0.0,
+                "with layer and recovery": 0.12}
+STUCK = data.SAFETY / "examples" / "n8_k4_s4"
+STUCK_DRONE = 3
 PART_COLOR = dict(zip(data.MEMORY_PARTS, ("#2a78d6", "#eb6834", "#1baf7a",
                                           "#eda100", "#e87ba4", "#008300")))
 PART_NAME = {"gazebo": "Gazebo", "px4": "PX4 autopilots", "mavros": "MAVROS",
@@ -105,8 +119,9 @@ def style():
 
 def save(fig, name):
     OUT.mkdir(parents=True, exist_ok=True)
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT / f"{name}.{ext}")
+    # Without a creation date the PDF only changes when the figure does.
+    fig.savefig(OUT / f"{name}.pdf", metadata={"CreationDate": None})
+    fig.savefig(OUT / f"{name}.png")
     plt.close(fig)
     print(f"  {OUT / name}.pdf / .png")
 
@@ -125,8 +140,15 @@ def percent(successes, n):
 
 
 def error_bars(values):
-    """[[distance down], [distance up]] for errorbar from (value, low, high)."""
-    return [[v - lo for v, lo, _ in values], [hi - v for v, _, hi in values]]
+    """[[distance down], [distance up]] for errorbar from (value, low, high).
+
+    At exactly 0% or 100% rounding can put the end of the interval a hair on
+    the wrong side of the value (with 100 of 100 the upper end comes out as
+    99.99999999999999), and matplotlib refuses a negative length, so the
+    lengths are kept at 0 or more.
+    """
+    return [[max(0.0, v - lo) for v, lo, _ in values],
+            [max(0.0, hi - v) for v, _, hi in values]]
 
 
 # ---------------------------------------------------------------- figures
@@ -437,6 +459,155 @@ def fig_example(drones):
     save(fig, "08_example_flight")
 
 
+def fig_safety_outcomes():
+    flights = data.safety_mujoco()
+    # 15 and 20 drones: the same controllers on the crowded mazes.
+    for arm, by_key in data.safety_mujoco(data.SAFETY_CROWD).items():
+        flights[arm].update(by_key)
+    drones = {arm: data.read_drones(folders) for arm, folders in data.SAFETY_ARMS.items()}
+    fig, axes = plt.subplots(2, 3, figsize=(WIDTH, 4.6), squeeze=False)
+
+    def arrived(outcome):
+        return outcome == "reached"
+
+    def crashed(outcome):
+        return outcome in data.MUJOCO_CRASHES or outcome == "destroyed"
+
+    def timed_out(outcome):
+        return outcome == "timeout"
+
+    jobs = ((0, "MuJoCo", (1, 2, 3, 4, 6, 8, 10, *data.CROWD_COUNTS)),
+            (1, "Gazebo", (1, 2, 3, 4)))
+    # Arrivals are all near 100%, so that axis starts higher; the other two
+    # start at 0.
+    limits = {("MuJoCo", "arrived"): (88, 100.8), ("MuJoCo", "crashed"): (0, 8),
+              ("MuJoCo", "timed out"): (0, 8), ("Gazebo", "arrived"): (80, 101.5),
+              ("Gazebo", "crashed"): (0, 20), ("Gazebo", "timed out"): (0, 20)}
+    for row, simulator, counts in jobs:
+        for col, (test, what) in enumerate(((arrived, "arrived"), (crashed, "crashed"),
+                                            (timed_out, "timed out"))):
+            ax = axes[row][col]
+            for arm in SAFETY_CONTROLLERS:
+                values = []
+                for k in counts:
+                    if simulator == "MuJoCo":
+                        outs = [f["outcome"] for key, f in flights[arm].items() if key[0] == k]
+                    else:
+                        outs = [d["outcome"] for d in drones[arm].values() if d["k"] == k]
+                    values.append(percent(sum(test(o) for o in outs), len(outs)))
+                if simulator == "MuJoCo":
+                    ax.fill_between(counts, [lo for _, lo, _ in values],
+                                    [hi for _, _, hi in values], color=COLOR[arm],
+                                    alpha=0.15, linewidth=0)
+                    ax.plot(counts, [v for v, _, _ in values], color=COLOR[arm],
+                            marker=MARKER[arm], clip_on=False, zorder=3)
+                else:
+                    xs = [k + SAFETY_SHIFT[arm] for k in counts]
+                    ax.errorbar(xs, [v for v, _, _ in values], yerr=error_bars(values),
+                                color=COLOR[arm], marker=MARKER[arm], linestyle="none",
+                                capsize=2, elinewidth=0.8, clip_on=False, zorder=3)
+            ax.set_title(f"{simulator}: {what}")
+            # 1 to 20 drones: 2 and 3 have points but no labels, or 1, 2 and 3 run together.
+            ax.set_xticks([k for k in counts if k not in (2, 3)] if len(counts) > 4 else counts)
+            ax.set_xlabel("drones in the maze")
+            if col == 0:
+                ax.set_ylabel("flights (%)" if simulator == "MuJoCo" else "drones (%)")
+            ax.set_ylim(*limits[(simulator, what)])
+    controller_legend(fig, SAFETY_CONTROLLERS)
+    fig.tight_layout()
+    save(fig, "09_safety_outcomes")
+
+
+def read_mission(path):
+    """outcome and simulated flight time from a mission.yaml."""
+    text = path.read_text()
+    outcome = re.search(r"^outcome: (\w+)", text, re.M).group(1)
+    seconds = float(re.search(r"^simulation_time: ([\d.]+)", text, re.M).group(1))
+    return outcome, seconds
+
+
+def recovery_start(path):
+    """Time of the first decision the recovery made, or None."""
+    if not path.exists():
+        return None
+    with open(path) as f:
+        for r in csv.DictReader(f):
+            if r.get("mode") == "recovery":
+                return float(r["t"])
+    return None
+
+
+def fig_stuck_drone():
+    starts, targets, boxes = read_scenario(STUCK / "scenario.yaml")
+    i = STUCK_DRONE
+    fig, axes = plt.subplots(2, 3, figsize=(WIDTH, 4.0), squeeze=False,
+                             gridspec_kw={"height_ratios": [1.8, 1.2]})
+    words = {"reached": "arrived", "destroyed": "crashed", "timeout": "timed out"}
+    # The box the policy alone crashed into, to show the climb clears it.
+    crash = read_track(STUCK / "policy" / f"drone{i}" / "trajectory.csv")[-1]
+    blocker = min(boxes, key=lambda b: (max(b[0] - crash[1], 0, crash[1] - b[1]) ** 2
+                                        + max(b[2] - crash[2], 0, crash[2] - b[3]) ** 2))
+    longest = 0.0
+    for col, (arm, folder) in enumerate((("final policy", "policy"),
+                                         ("with layer", "shield"),
+                                         ("with layer and recovery", "shield_recovery"))):
+        top, side = axes[0][col], axes[1][col]
+        drone_dir = STUCK / folder / f"drone{i}"
+        for x0, x1, y0, y1, _, z1 in boxes:
+            top.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, facecolor=OBSTACLE,
+                                    edgecolor=MUTED, linewidth=0.6))
+            if -11 < (x0 + x1) / 2 < 5 and -4 < (y0 + y1) / 2 < 8:
+                top.text((x0 + x1) / 2, (y0 + y1) / 2, f"{z1:.1f}", ha="center",
+                         va="center", fontsize=6, color=INK2, clip_on=True)
+        track = read_track(drone_dir / "trajectory.csv")
+        outcome, seconds = read_mission(drone_dir / "mission.yaml")
+        top.plot([r[1] for r in track], [r[2] for r in track], color=COLOR[arm],
+                 linewidth=1.3)
+        top.plot([starts[i][0]], [starts[i][1]], marker="o", color=INK2, linestyle="none")
+        top.plot([targets[i][0]], [targets[i][1]], marker="*", markersize=9, color=INK2,
+                 linestyle="none")
+        side.axhline(blocker[5], color=MUTED, linewidth=0.8, linestyle=":")
+        side.plot([r[0] for r in track], [r[3] for r in track], color=COLOR[arm],
+                  linewidth=1.3)
+        if outcome == "destroyed":
+            end = track[-1]
+            top.plot([end[1]], [end[2]], marker="X", markersize=7, color=INK, linestyle="none")
+            side.plot([end[0]], [end[3]], marker="X", markersize=7, color=INK, linestyle="none")
+        start = recovery_start(drone_dir / "decisions.csv")
+        if start is not None:
+            here = min(track, key=lambda r: abs(r[0] - start))
+            top.plot([here[1]], [here[2]], marker="o", markersize=5, markerfacecolor="white",
+                     markeredgecolor=INK, linestyle="none")
+            side.axvline(start, color=MUTED, linewidth=0.8, linestyle="--")
+        longest = max(longest, track[-1][0])
+        top.set_title(f"{arm}:\n{words.get(outcome, outcome)} after {seconds:.0f} s")
+        top.set_aspect("equal")
+        top.set_xlim(-11, 5)
+        top.set_ylim(-4, 8)
+        top.set_xlabel("x (m)")
+        side.set_xlabel("time (s)")
+    axes[0][0].set_ylabel("y (m)")
+    axes[1][0].set_ylabel("altitude (m)")
+    for side in axes[1]:
+        side.set_xlim(0, longest + 2)
+        side.set_ylim(0, 12)
+        # Under the line and on the right, where no flight passes.
+        side.text(longest, blocker[5] - 0.4, f"box beside the gap, {blocker[5]:.1f} m",
+                  fontsize=6.5, color=INK2, ha="right", va="top")
+    handles = [Line2D([], [], linestyle="none", marker="o", color=INK2, label="start"),
+               Line2D([], [], linestyle="none", marker="*", markersize=9, color=INK2,
+                      label="target"),
+               Line2D([], [], linestyle="none", marker="X", markersize=7, color=INK,
+                      label="crashed"),
+               Line2D([], [], linestyle="none", marker="o", markersize=5,
+                      markerfacecolor="white", markeredgecolor=INK,
+                      label="recovery starts"),
+               Patch(facecolor=OBSTACLE, edgecolor=MUTED, label="obstacle, height in m")]
+    fig.legend(handles=handles, loc="lower center", ncol=5, bbox_to_anchor=(0.5, 1.0))
+    fig.tight_layout()
+    save(fig, "10_stuck_drone")
+
+
 def main():
     style()
     runs = {arm: data.gazebo_runs(arm) for arm in data.ARMS}
@@ -450,6 +621,8 @@ def main():
     fig_cpu(runs, drones)
     fig_memory()
     fig_example(drones)
+    fig_safety_outcomes()
+    fig_stuck_drone()
 
 
 if __name__ == "__main__":

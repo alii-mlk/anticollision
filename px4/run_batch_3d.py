@@ -272,7 +272,8 @@ def wait_for_ready(log_dir, k, timeout=120):
     return False
 
 
-def run_one(n, k, seed, batch_dir, timeout, wall_timeout, policy=None):
+def run_one(n, k, seed, batch_dir, timeout, wall_timeout, policy=None, shield=None,
+            recovery=False):
     run_dir = batch_dir / f"n{n}_k{k}_s{seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
     scenario = run_dir / "scenario"
@@ -331,7 +332,9 @@ def run_one(n, k, seed, batch_dir, timeout, wall_timeout, policy=None):
             [sys.executable, str(MULTI), "--scenario", str(scenario),
              "--out", str(run_dir / "run"), "--timeout", str(timeout),
              "--wall-timeout", str(wall_timeout),
-             *(["--policy", str(policy)] if policy else [])],
+             *(["--policy", str(policy)] if policy else []),
+             *(["--shield", str(shield)] if shield else []),
+             *(["--recovery"] if recovery else [])],
             stdout=log, stderr=subprocess.STDOUT, text=True)
         while mission.poll() is None:
             # Nothing in the measurement may stop a flight that is under way.
@@ -424,23 +427,55 @@ def main():
                     help="fly every drone with this trained policy "
                          "(an rl/runs/<name> directory); default: straight. "
                          "Needs the RL venv: source rl/env.sh")
+    ap.add_argument("--shield", default=None,
+                    help="with --policy: check every command with the safety layer "
+                         "(rl/shield.py), a JSON settings file or 'default'")
+    ap.add_argument("--recovery", action="store_true",
+                    help="with --shield: a stuck drone climbs over the boxes (rl/recovery.py)")
+    ap.add_argument("--runs", nargs="+", default=None,
+                    help="fly only these runs, named like n20_k3_s5, instead of the "
+                         "grid of --n, --k and --seeds")
     args = ap.parse_args()
 
+    if args.runs:
+        grid = []
+        for name in args.runs:
+            m = re.fullmatch(r"n(\d+)_k(\d+)_s(\d+)", name)
+            if not m:
+                sys.exit(f"--runs: '{name}' is not a run name like n20_k3_s5")
+            grid.append(tuple(int(g) for g in m.groups()))
+    else:
+        grid = [(n, k, s) for n in args.n for k in args.k for s in args.seeds]
+    if args.recovery and args.shield is None:
+        sys.exit("--recovery needs --shield")
     if args.policy is not None:
         args.policy = args.policy.expanduser().resolve()
         # Only looked up with find_spec. Importing it would load PyTorch into
         # this process for nothing.
         if importlib.util.find_spec("stable_baselines3") is None:
             sys.exit("--policy needs the RL venv. Run  source rl/env.sh  first.")
+    if args.shield is not None:
+        if args.policy is None:
+            sys.exit("--shield needs --policy")
+        if args.shield != "default":
+            args.shield = str(Path(args.shield).expanduser().resolve())
+            if not Path(args.shield).exists():
+                sys.exit(f"shield settings not found: {args.shield}")
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    label = "policy" if args.policy else "straight"
+    label = ("shield_recovery" if args.recovery else "shield" if args.shield
+             else "policy" if args.policy else "straight")
     batch_dir = (args.out or (HERE / "runs3d" / f"batch_{stamp}_{label}")).resolve()
     batch_dir.mkdir(parents=True, exist_ok=True)
 
-    total = len(args.n) * len(args.k) * len(args.seeds)
+    total = len(grid)
     print(f"Flying: {'policy ' + str(args.policy) if args.policy else 'straight (no avoidance)'}")
-    print(f"Sweep: n in {args.n}, k in {args.k}, seeds {args.seeds}")
+    if args.shield:
+        print(f"Shield: {args.shield}{', with the recovery' if args.recovery else ''}")
+    if args.runs:
+        print(f"Runs: {' '.join(args.runs)}")
+    else:
+        print(f"Sweep: n in {args.n}, k in {args.k}, seeds {args.seeds}")
     print(f"{total} runs -> {batch_dir}")
     print()
 
@@ -448,11 +483,9 @@ def main():
 
     started = time.monotonic()
     try:
-        for n in args.n:
-            for k in args.k:
-                for seed in args.seeds:
-                    run_one(n, k, seed, batch_dir, args.timeout, wall_timeout,
-                            args.policy)
+        for n, k, seed in grid:
+            run_one(n, k, seed, batch_dir, args.timeout, wall_timeout,
+                    args.policy, args.shield, args.recovery)
     except KeyboardInterrupt:
         print("\ninterrupted; cleaning up")
         teardown()

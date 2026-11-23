@@ -1,0 +1,13 @@
+large evaluation 2026-11-19 20:59:57, mujoco flight model, 400 mazes per number of drones, seeds from 300000, decision every 0.146 s
+
+ k  policy                 flights  reached              crashed               timeout hit drone  ratio clearance
+-----------------------------------------------------------------------------------------------------------------
+ 1  model/final                400   94.2% [91.5, 96.1]    5.2% [ 3.5,  7.9]      0.5%         0  1.133     1.04m
+
+ 2  model/final                800   95.9% [94.3, 97.0]    3.6% [ 2.5,  5.2]      0.5%         0  1.142     1.06m
+
+ 3  model/final               1200   95.2% [93.9, 96.3]    4.3% [ 3.3,  5.6]      0.4%         0  1.142     1.07m
+
+ 4  model/final               1600   96.4% [95.4, 97.2]    3.1% [ 2.4,  4.1]      0.4%         0  1.151     1.09m
+
+took 6.6 min

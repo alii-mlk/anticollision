@@ -1,0 +1,6 @@
+{
+  "margin": 0.3,
+  "drone_margin": 0.4,
+  "lookahead": 0.5,
+  "lag": 0.4
+}

@@ -4,7 +4,7 @@
 Reads the per-run and per-drone files that px4/compute_metrics_3d.py wrote
 for the Gazebo sweeps, and the per-flight files of rl/evaluate_large.py for
 the MuJoCo evaluation. Writes every table as text into
-results/thesis/tables.txt and as CSV into results/thesis/tables/.
+results/tables/all_tables.txt and each one as CSV into results/tables/.
 
 How the numbers are computed:
 
@@ -20,11 +20,16 @@ How the numbers are computed:
   mean, std           over the drones or runs named in the table. The standard
                       deviation is the sample one, with n - 1.
 
-The three controllers:
+The three controllers of stages 2 to 4:
 
   straight        no avoidance, every drone flies the straight line
   trained alone   the October policy, trained with one drone in the maze
   final policy    trained with 4 to 8 drones and the neighbour inputs
+
+The stage 5 tables (from Table 15 on) compare, on the same scenarios and all
+with the decision timing fixed on 2026-11-19, the final policy alone, the
+policy with the safety layer of rl/shield.py, and the policy with the layer
+and the recovery of rl/recovery.py.
 
 Plain Python without packages, so it runs on any machine.
 
@@ -40,7 +45,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OCTOBER = HERE / "2026-10-19_rl_sweep"
 NOVEMBER = HERE / "2026-11-15_swarm_sweep"
-OUT = HERE / "thesis"
+SAFETY = HERE / "2026-11-21_safety_layer"
+TABLES = HERE / "tables"
 
 # Where the Gazebo runs of each controller are. The sweep has 1 to 3 drones;
 # the runs with 4 drones are batches of their own, and the policy trained
@@ -76,6 +82,46 @@ SEPARATION = {
 }
 # Two drones touch when their centres are this close (twice the radius).
 TOUCHING_M = 0.7
+
+# Stage 5: the Gazebo batches of each controller, all with the fixed timing,
+# and the large MuJoCo evaluations with the name of the policy in each file.
+SAFETY_ARMS = {
+    "final policy": [SAFETY / "gazebo" / "policy_timing",
+                     SAFETY / "gazebo" / "policy_timing_k4"],
+    "with layer": [SAFETY / "gazebo" / "shield", SAFETY / "gazebo" / "shield_k4"],
+    "with layer and recovery": [SAFETY / "gazebo" / "shield_recovery",
+                                SAFETY / "gazebo" / "shield_recovery_k4"],
+}
+SAFETY_MUJOCO = {
+    "final policy": (NOVEMBER / "mujoco" / "large_swarm_scaling_2.csv.gz",
+                     "swarm_4/final"),
+    "with layer": (SAFETY / "mujoco" / "large_shield_default.csv.gz",
+                   "model/final + shield"),
+    "with layer and recovery": (SAFETY / "mujoco" / "large_final_recovery.csv.gz",
+                                "model/final + shield + recovery"),
+}
+# 15 and 20 drones in the same area, every controller on the same mazes. A maze
+# the generator could not build for that many drones was drawn again with a new
+# seed and the same number of boxes (evaluate_large.py --redraw).
+SAFETY_CROWD = {
+    "final policy": (SAFETY / "mujoco" / "large_crowd_recovery.csv.gz", "model/final"),
+    "with layer": (SAFETY / "mujoco" / "large_crowd_shield.csv.gz",
+                   "model/final + shield"),
+    "with layer and recovery": (SAFETY / "mujoco" / "large_crowd_recovery.csv.gz",
+                                "model/final + shield + recovery"),
+}
+CROWD_COUNTS = (15, 20)
+REDRAWN = 1_000_000       # seeds from here on are redrawn mazes
+# The same scenarios flown in MuJoCo, drone by drone, against two Gazebo sweeps.
+SIMULATOR_PAIRS = (
+    ("decision every 0.15 s in Gazebo", SAFETY / "mujoco" / "compare_final_0104.csv"),
+    ("decision every 0.104 s in both", SAFETY / "mujoco" / "compare_fixed_timing.csv"),
+)
+ES_PROGRESS = SAFETY / "es" / "progress.csv"
+DECISION_S = 5 / 48       # one decision in MuJoCo, 5 control steps at 48 Hz
+OUTCOME_WORDS = {"reached": "arrived", "destroyed": "crashed", "timeout": "timed out",
+                 "collided": "crashed", "hit_drone": "crashed", "ground": "crashed",
+                 "out_of_bounds": "crashed"}
 
 # Groups of drone counts a table has rows for. "1 to 3" is the whole sweep.
 K_GROUPS = (1, 2, 3, "1 to 3", 4)
@@ -133,8 +179,13 @@ def gazebo_runs(arm):
 
 def gazebo_drones(arm):
     """{(run name, drone): row of drones.csv}, numbers converted."""
+    return read_drones(ARMS[arm])
+
+
+def read_drones(folders):
+    """{(run name, drone): row of drones.csv} from these batch folders."""
     rows = {}
-    for folder in ARMS[arm]:
+    for folder in folders:
         for r in read(folder / "drones.csv"):
             for field in ("euclidean", "travelled", "time", "min_clearance"):
                 r[field] = float(r[field])
@@ -207,6 +258,37 @@ def mujoco_flights():
                 r[field] = float(r[field])
             flights[name].append(r)
     return flights
+
+
+def safety_mujoco(sources=None):
+    """{controller: {(drones, obstacles, seed, drone): flight}} for stage 5."""
+    out = {}
+    for name, (path, label) in (sources or SAFETY_MUJOCO).items():
+        flights = {}
+        for r in read(path):
+            if r["policy"] != label:
+                continue
+            r["k"] = int(r["k_drones"])
+            r["seconds"] = int(r["decisions"]) * DECISION_S
+            for field in ("euclidean", "travelled", "min_clearance"):
+                r[field] = float(r[field])
+            flights[(r["k"], int(r["n_obstacles"]), int(r["scene_seed"]),
+                     int(r["drone"]))] = r
+        out[name] = flights
+    return out
+
+
+def mcnemar(only_a, only_b):
+    """Two-sided exact McNemar test on the pairs that differ."""
+    n = only_a + only_b
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(only_a, only_b) + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
+
+
+def count(values):
+    return sum(1 for v in values if v)
 
 
 # ----------------------------------------------------------------- tables
@@ -635,7 +717,7 @@ def table_mujoco(flights):
                     "at most %", "timeout %", "ratio mean", "ratio std",
                     "clearance median (m)"],
         "rows": rows,
-        "notes": ["The mazes have 0, 5, 10, 15 or 20 obstacles and were not "
+        "notes": ["The mazes have 4, 8, 12, 16 or 20 obstacles and were not "
                   "used to train or to choose any policy.",
                   "Crashed: hit an obstacle, another drone or the ground, or "
                   "left the area. Hit drone is the part of crashed that was "
@@ -667,6 +749,288 @@ def table_simulators(drones):
         "notes": ["MuJoCo is the simulator the policy was trained in, Gazebo "
                   "with PX4 the one it is tested in.",
                   "For 2 drones see mujoco/check_swarm_swarm_4.txt."],
+    }
+
+
+def table_safety_gazebo(drones):
+    rows = []
+    for group in K_GROUPS:
+        for arm in SAFETY_ARMS:
+            ds = [d for d in drones[arm].values() if in_group(d["k"], group)]
+            if not ds:
+                continue
+            reached = count(d["arrived"] for d in ds)
+            decisions = sum(float(d["decisions"] or 0) for d in ds)
+            changed = sum(float(d.get("shield_changed") or 0) for d in ds)
+            shielded = any(d.get("shield_changed") not in (None, "") for d in ds)
+            recovered = count(float(d.get("recovery_decisions") or 0) > 0 for d in ds)
+            rows.append([
+                group, arm, len(ds), reached, num(100 * reached / len(ds), 1),
+                interval(reached, len(ds)),
+                count(d["collided_with"] == "an obstacle" for d in ds),
+                count(d["collided_with"] == "another drone" for d in ds),
+                count(d["outcome"] == "timeout" for d in ds),
+                num(min(d["min_clearance"] for d in ds), 3),
+                num(100 * changed / decisions, 2) if shielded and decisions else "-",
+                recovered if arm == "with layer and recovery" else "-"])
+        rows.append(None)
+    return {
+        "name": "safety_gazebo",
+        "title": "Gazebo with the safety layer: the same 100 scenarios, every "
+                 "drone deciding every 0.104 s",
+        "columns": ["drones", "controller", "flights", "arrived", "%",
+                    "95% interval", "hit obstacle", "hit drone", "timed out",
+                    "closest (m)", "changed %", "recovered"],
+        "rows": rows,
+        "notes": ["Closest: the smallest gap between a drone and an obstacle "
+                  "over all drones of the row; 0 or less means it touched.",
+                  "Changed: commands the layer replaced, in % of the "
+                  "decisions. Recovered: drones the recovery flew for a while.",
+                  "The policy alone was flown again with the fixed timing, so "
+                  "these runs differ a little from the stage 4 tables."],
+    }
+
+
+def table_safety_gazebo_pairs(drones):
+    rows = []
+    arms = list(SAFETY_ARMS)
+    for group in K_GROUPS:
+        keys = [key for key in drones[arms[0]]
+                if all(key in drones[a] for a in arms)
+                and in_group(drones[arms[0]][key]["k"], group)]
+        if not keys:
+            continue
+        patterns = {}
+        for key in keys:
+            pattern = tuple(OUTCOME_WORDS.get(drones[a][key]["outcome"],
+                                              drones[a][key]["outcome"]) for a in arms)
+            patterns[pattern] = patterns.get(pattern, 0) + 1
+        for pattern, n in sorted(patterns.items(), key=lambda item: -item[1]):
+            rows.append([group, *pattern, n])
+        rows.append(None)
+    return {
+        "name": "safety_gazebo_drone_by_drone",
+        "title": "Gazebo: the same drone in the same scenario with each "
+                 "controller",
+        "columns": ["drones", "final policy", "with layer",
+                    "with layer and recovery", "flights"],
+        "rows": rows,
+        "notes": ["Every pattern that occurred, with how many drones had it."],
+    }
+
+
+def table_safety_mujoco(flights):
+    rows = []
+    for k in (1, 2, 3, 4, 6, 8, 10, "all"):
+        for arm, by_key in flights.items():
+            fs = [f for key, f in by_key.items() if k == "all" or key[0] == k]
+            n = len(fs)
+            reached = count(f["outcome"] == "reached" for f in fs)
+            crashed = count(f["outcome"] in MUJOCO_CRASHES for f in fs)
+            arrived = [f for f in fs if f["outcome"] == "reached"]
+            decisions = sum(int(f["decisions"]) for f in fs)
+            shielded = "shield_changed" in fs[0] and fs[0]["shield_changed"] != ""
+            changed = sum(int(f["shield_changed"] or 0) for f in fs) if shielded else 0
+            recovered = count(int(f.get("shield_recovery") or 0) > 0 for f in fs)
+            rows.append([
+                k, arm, n, num(100 * reached / n, 1), interval(reached, n),
+                crashed, count(f["outcome"] == "hit_drone" for f in fs),
+                count(f["outcome"] == "timeout" for f in fs),
+                num(100 * wilson(crashed, n)[1], 3),
+                num(statistics.fmean(f["travelled"] / f["euclidean"] for f in arrived), 3),
+                num(min(f["min_clearance"] for f in fs), 3),
+                num(100 * changed / decisions, 2) if shielded else "-",
+                recovered if arm == "with layer and recovery" else "-"])
+        rows.append(None)
+    return {
+        "name": "safety_mujoco",
+        "title": "MuJoCo with the safety layer: the 13,600 flights of the "
+                 "final evaluation",
+        "columns": ["drones", "controller", "flights", "arrived %",
+                    "95% interval", "crashed", "hit drone", "timed out",
+                    "crashes at most %", "ratio mean", "closest (m)",
+                    "changed %", "recovered"],
+        "rows": rows,
+        "notes": ["The same 400 mazes per number of drones as the MuJoCo "
+                  "evaluation table (seeds from 300000).",
+                  "Crashed: hit an obstacle, another drone or the ground, or "
+                  "left the area (26 of the 589 flights of the final policy "
+                  "left the area).",
+                  "Crashes at most: upper end of the 95% interval of the "
+                  "share that crashed. With no crash in 13,600 flights it is "
+                  "0.028%.",
+                  "A flight in MuJoCo ends after 600 decisions (62.5 s), in "
+                  "Gazebo after 180 s."],
+    }
+
+
+def table_safety_mujoco_pairs(flights):
+    arms = list(flights)
+    keys = [key for key in flights[arms[0]] if all(key in flights[a] for a in arms)]
+    patterns = {}
+    for key in keys:
+        pattern = tuple(OUTCOME_WORDS.get(flights[a][key]["outcome"],
+                                          flights[a][key]["outcome"]) for a in arms)
+        patterns[pattern] = patterns.get(pattern, 0) + 1
+    rows = [[*pattern, n] for pattern, n in sorted(patterns.items(), key=lambda i: -i[1])]
+    return {
+        "name": "safety_mujoco_flight_by_flight",
+        "title": "MuJoCo: the same flight with each controller",
+        "columns": ["final policy", "with layer", "with layer and recovery",
+                    "flights"],
+        "rows": rows,
+        "notes": ["All 13,600 flights, 1 to 10 drones. Crashed includes "
+                  "leaving the area."],
+    }
+
+
+def table_safety_crowd(flights):
+    rows = []
+    for k in (*CROWD_COUNTS, "both"):
+        for arm, by_key in flights.items():
+            fs = [f for key, f in by_key.items() if k == "both" or key[0] == k]
+            n = len(fs)
+            reached = count(f["outcome"] == "reached" for f in fs)
+            crashed = count(f["outcome"] in MUJOCO_CRASHES for f in fs)
+            arrived = [f for f in fs if f["outcome"] == "reached"]
+            decisions = sum(int(f["decisions"]) for f in fs)
+            shielded = fs[0].get("shield_changed", "") != ""
+            changed = sum(int(f["shield_changed"] or 0) for f in fs) if shielded else 0
+            recovered = count(int(f.get("shield_recovery") or 0) > 0 for f in fs)
+            rows.append([
+                k, arm, n, num(100 * reached / n, 1), interval(reached, n),
+                crashed, count(f["outcome"] == "hit_drone" for f in fs),
+                count(f["outcome"] == "timeout" for f in fs),
+                num(100 * wilson(crashed, n)[1], 3),
+                num(statistics.fmean(f["travelled"] / f["euclidean"] for f in arrived), 3),
+                num(min(f["min_clearance"] for f in fs), 3),
+                num(100 * changed / decisions, 2) if shielded else "-",
+                recovered if arm == "with layer and recovery" else "-"])
+        rows.append(None)
+    mazes = {k: {key[1:3] for key in flights["final policy"] if key[0] == k}
+             for k in CROWD_COUNTS}
+    redrawn = {k: count(seed >= REDRAWN for _, seed in mazes[k]) for k in CROWD_COUNTS}
+    return {
+        "name": "safety_mujoco_crowd",
+        "title": "MuJoCo with 15 and 20 drones in the same area",
+        "columns": ["drones", "controller", "flights", "arrived %",
+                    "95% interval", "crashed", "hit drone", "timed out",
+                    "crashes at most %", "ratio mean", "closest (m)",
+                    "changed %", "recovered"],
+        "rows": rows,
+        "notes": [f"{len(mazes[k])} mazes with {k} drones, seeds from 300000 as in the "
+                  f"final evaluation; {redrawn[k]} of them could not be built for {k} "
+                  "drones and were drawn again with a new seed and the same number of "
+                  "boxes." for k in CROWD_COUNTS] +
+                 ["Hit drone counts drones, so every contact between two drones "
+                  "counts twice.",
+                  "Closest: the smallest gap to an obstacle, the ground or another "
+                  "drone over all flights of the row."],
+    }
+
+
+def table_simulators_same_scenarios():
+    rows = []
+    for timing, path in SIMULATOR_PAIRS:
+        pairs = read(path)
+        for group in (1, 2, 3, 4, "all"):
+            ps = [p for p in pairs if group == "all" or int(p["k_drones"]) == group]
+            c = {kind: count(p["pair"] == kind for p in ps)
+                 for kind in ("both", "gazebo_only", "mujoco_only", "neither")}
+            rows.append([timing, group, len(ps), c["both"] + c["neither"],
+                         c["both"], c["gazebo_only"], c["mujoco_only"],
+                         c["neither"],
+                         num(mcnemar(c["gazebo_only"], c["mujoco_only"]), 3)])
+        rows.append(None)
+    return {
+        "name": "simulators_drone_by_drone",
+        "title": "The final policy on the 100 Gazebo scenarios, flown again "
+                 "in MuJoCo drone by drone",
+        "columns": ["timing", "drones", "flights", "same outcome",
+                    "arrived in both", "only in Gazebo", "only in MuJoCo",
+                    "in neither", "McNemar p"],
+        "rows": rows,
+        "notes": ["Same starts, targets and obstacles in both simulators. "
+                  "MuJoCo always decides every 0.104 s.",
+                  "McNemar p: exact two-sided test on the drones that differ. "
+                  "Above 0.05 the split between the two columns is what "
+                  "chance would give."],
+    }
+
+
+def table_safety_cost(drones, flights):
+    rows = []
+    arms = list(SAFETY_ARMS)
+    for group in K_GROUPS:
+        keys = [key for key in drones[arms[0]]
+                if all(key in drones[a] and drones[a][key]["arrived"] for a in arms)
+                and in_group(drones[arms[0]][key]["k"], group)]
+        if not keys:
+            continue
+        row = ["Gazebo", group, len(keys)]
+        for a in arms:
+            row.append(num(statistics.fmean(drones[a][x]["time"] for x in keys), 2))
+        for a in arms:
+            row.append(num(statistics.fmean(drones[a][x]["travelled"] / drones[a][x]["euclidean"]
+                                            for x in keys), 3))
+        for a in arms:
+            load = [100 * float(drones[a][x]["controller_cpu_time"]) / drones[a][x]["time"]
+                    for x in keys if drones[a][x]["controller_cpu_time"]]
+            row.append(num(statistics.fmean(load), 1) if load else "-")
+        rows.append(row)
+    rows.append(None)
+    farms = list(flights)
+    keys = [key for key in flights[farms[0]]
+            if all(key in flights[a] and flights[a][key]["outcome"] == "reached" for a in farms)]
+    row = ["MuJoCo", "1 to 10", len(keys)]
+    for a in farms:
+        row.append(num(statistics.fmean(flights[a][x]["seconds"] for x in keys), 2))
+    for a in farms:
+        row.append(num(statistics.fmean(flights[a][x]["travelled"] / flights[a][x]["euclidean"]
+                                        for x in keys), 3))
+    row += ["-", "-", "-"]
+    rows.append(row)
+    return {
+        "name": "safety_cost",
+        "title": "What the safety layer and the recovery cost a drone that "
+                 "arrives with every controller",
+        "columns": ["simulator", "drones", "flights", "time policy (s)",
+                    "time layer (s)", "time recovery (s)", "ratio policy",
+                    "ratio layer", "ratio recovery", "cpu policy (%)",
+                    "cpu layer (%)", "cpu recovery (%)"],
+        "rows": rows,
+        "notes": ["Only drones that arrived with all three, same drone and "
+                  "same scenario. Time: flight time, mean. Ratio: travelled "
+                  "over straight-line distance, mean.",
+                  "Cpu: processor time of the drone's mission node (lidar, "
+                  "network, layer) in % of one core."],
+    }
+
+
+def table_es():
+    rows = []
+    for r in read(ES_PROGRESS):
+        rows.append([r["iteration"], num(float(r["margin"]), 3),
+                     num(float(r["drone_margin"]), 3), num(float(r["lookahead"]), 3),
+                     num(float(r["lag"]), 3), num(float(r["score"]), 4),
+                     f"{r['reached']}/{r['flights']}", r["crashed"], r["timeout"],
+                     num(float(r["best_perturbed"]), 4),
+                     num(float(r["worst_perturbed"]), 4)])
+    return {
+        "name": "es_tuning",
+        "title": "Evolution strategy on the safety layer's settings, "
+                 "ordinary tuning mazes",
+        "columns": ["iteration", "margin (m)", "drone margin (m)",
+                    "look-ahead (s)", "lag (s)", "score", "arrived",
+                    "crashed", "timed out", "best tried", "worst tried"],
+        "rows": rows,
+        "notes": ["Salimans et al. (2017), Algorithm 1 with mirrored "
+                  "sampling and centred ranks: 6 pairs of settings per "
+                  "iteration around the current one, 336 flights each (24 "
+                  "mazes for 2, 4 and 8 drones, seeds from 400000).",
+                  "Score per flight: 1 if it arrives, -10 if it crashes, "
+                  "-0.01 per second. Stopped after the iterations shown: "
+                  "every setting tried scored within 0.01 of the others."],
     }
 
 
@@ -715,20 +1079,31 @@ def main():
         table_mujoco(mujoco_flights()),
         table_simulators(drones),
     ]
+    safety = {arm: read_drones(folders) for arm, folders in SAFETY_ARMS.items()}
+    flights = safety_mujoco()
+    tables += [
+        table_safety_gazebo(safety),
+        table_safety_gazebo_pairs(safety),
+        table_safety_mujoco(flights),
+        table_safety_mujoco_pairs(flights),
+        table_simulators_same_scenarios(),
+        table_safety_cost(safety, flights),
+        table_es(),
+        table_safety_crowd(safety_mujoco(SAFETY_CROWD)),
+    ]
 
-    (OUT / "tables").mkdir(parents=True, exist_ok=True)
+    TABLES.mkdir(parents=True, exist_ok=True)
     text = []
     for number, table in enumerate(tables, start=1):
         text.append(f"Table {number}. " + as_text(table))
-        with open(OUT / "tables" / f"{number:02d}_{table['name']}.csv", "w",
+        with open(TABLES / f"{number:02d}_{table['name']}.csv", "w",
                   newline="") as f:
             writer = csv.writer(f)
             writer.writerow(table["columns"])
             writer.writerows(row for row in table["rows"] if row is not None)
-    (OUT / "tables.txt").write_text("\n\n\n".join(text) + "\n")
+    (TABLES / "all_tables.txt").write_text("\n\n\n".join(text) + "\n")
     print("\n\n\n".join(text))
-    print(f"\n-> {OUT / 'tables.txt'} and {len(tables)} CSV files in "
-          f"{OUT / 'tables'}")
+    print(f"\n-> {TABLES / 'all_tables.txt'} and {len(tables)} CSV files in {TABLES}")
 
 
 if __name__ == "__main__":

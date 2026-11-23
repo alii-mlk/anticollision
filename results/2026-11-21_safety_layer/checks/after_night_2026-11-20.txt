@@ -1,0 +1,242 @@
+75 runs -> runs3d/batch_20261120_033828_shield/metrics.csv
+statuses: 74x OK, 1x SPAWN_FAIL
+
+  n   k  runs   reached  coll  (obst/drone)  euclid(m)  travel(m)   ratio  ratio+   sim(s)  wall(s)    rtf   cpu(s)  ctrl(s)  ram(MB)  ctrl ram
+-----------------------------------------------------------------------------------------------------------------------------------------------
+  4   1     4       4/4   0.0       0.0/0.0       23.1       26.2   1.141   1.141     31.8     40.0   1.00       32      4.6      592       542
+  4   2     5     10/10   0.0       0.0/0.0       37.6       42.2   1.124   1.124     30.3     40.1   0.99       65     10.1     1054      1106
+  4   3     5     15/15   0.0       0.0/0.0       53.3       62.2   1.167   1.167     31.0     42.6   0.99      109     19.7     1625      1692
+  8   1     5       5/5   0.0       0.0/0.0       21.5       24.8   1.148   1.148     30.4     39.3   1.00       32      4.3      596       542
+  8   2     5     10/10   0.0       0.0/0.0       37.6       43.8   1.165   1.165     31.2     41.7   1.00       71     10.8     1059      1107
+  8   3     5     15/15   0.0       0.0/0.0       53.3       63.3   1.189   1.189     31.5     45.1   0.98      136     25.4     1631      1692
+ 12   1     5       5/5   0.0       0.0/0.0       21.5       25.1   1.170   1.170     30.9     39.6   1.00       31      4.5      608       542
+ 12   2     5     10/10   0.0       0.0/0.0       37.6       44.5   1.187   1.187     31.4     41.9   1.00       86     14.8     1073      1107
+ 12   3     5     15/15   0.0       0.0/0.0       53.3       64.7   1.214   1.214     31.8     47.6   0.95      146     26.5     1658      1687
+ 16   1     5       5/5   0.0       0.0/0.0       21.5       25.6   1.198   1.198     31.2     39.7   1.00       32      4.8      619       542
+ 16   2     5     10/10   0.0       0.0/0.0       37.6       44.8   1.192   1.192     31.1     42.4   0.98       92     16.3     1086      1107
+ 16   3     5     15/15   0.0       0.0/0.0       53.3       67.6   1.270   1.270     33.4     49.1   0.95      151     27.8     1674      1691
+ 20   1     5       5/5   0.0       0.0/0.0       21.5       27.6   1.286   1.286     33.2     41.8   1.00       37      5.8      631       543
+ 20   2     5     10/10   0.0       0.0/0.0       37.6       46.2   1.230   1.230     32.4     43.0   1.00       90     16.0     1098      1107
+ 20   3     5     14/15   0.0       0.0/0.0       53.3       93.4   1.803   1.280     63.5     76.2   0.98      213     35.6     1668      1694
+
+memory in MB, shared pages divided among the processes that share them
+  n   k  runs   gazebo      px4   mavros  helpers  mission  monitor    total  resident  free drop
+-------------------------------------------------------------------------------------------------
+  4   1     4      169        9      203      102      405       53      941      1134        724
+  4   2     5      184       15      501      151      702      109     1662      2161       1445
+  4   3     5      200       20      907      200     1010      173     2510      3317       2309
+  8   1     5      173        9      203      102      406       53      946      1138        729
+  8   2     5      187       15      502      151      705      109     1669      2166       1446
+  8   3     5      204       20      909      200     1004      173     2511      3323       2319
+ 12   1     5      184        9      203      102      407       53      958      1150        738
+ 12   2     5      199       15      504      150      701      108     1678      2179       1463
+ 12   3     5      216       20      924      200     1008      173     2542      3344       2340
+ 16   1     5      196        9      203      102      406       53      969      1162        749
+ 16   2     5      211       15      506      151      701      108     1693      2193       1477
+ 16   3     5      227       20      928      200     1009      174     2558      3364       2360
+ 20   1     5      208        9      203      102      406       53      982      1174        762
+ 20   2     5      222       15      506      150      704      109     1706      2205       1488
+ 20   3     5      239       20      911      200     1008      174     2552      3362       2362
+25 runs -> runs3d/batch_20261120_033828_k4_shield/metrics.csv
+statuses: 25x OK
+
+  n   k  runs   reached  coll  (obst/drone)  euclid(m)  travel(m)   ratio  ratio+   sim(s)  wall(s)    rtf   cpu(s)  ctrl(s)  ram(MB)  ctrl ram
+-----------------------------------------------------------------------------------------------------------------------------------------------
+  4   4     5     20/20   0.0       0.0/0.0       72.3       85.7   1.185   1.185     32.3     57.1   0.82      202     34.3     2328      2290
+  8   4     5     19/20   0.0       0.0/0.0       72.3      107.7   1.512   1.231     62.9     89.7   0.86      317     46.1     2337      2292
+ 12   4     5     19/20   0.0       0.0/0.0       72.3      109.3   1.534   1.266     63.2     90.4   0.85      316     46.9     2348      2291
+ 16   4     5     20/20   0.0       0.0/0.0       72.3       94.8   1.315   1.315     35.6     61.5   0.84      212     37.7     2360      2292
+ 20   4     5     19/20   0.0       0.0/0.0       72.3      119.7   1.686   1.352     66.5     93.5   0.84      321     50.3     2370      2290
+
+memory in MB, shared pages divided among the processes that share them
+  n   k  runs   gazebo      px4   mavros  helpers  mission  monitor    total  resident  free drop
+-------------------------------------------------------------------------------------------------
+  4   4     5      218       25     1440      250     1314      247     3493      4618       3309
+  8   4     5      221       25     1446      250     1315      248     3505      4629       3310
+ 12   4     5      233       25     1445      250     1312      248     3512      4639       3254
+ 16   4     5      245       25     1446      250     1315      248     3529      4652       3271
+ 20   4     5      257       25     1445      250     1316      247     3540      4660       3294
+75 runs -> runs3d/batch_20261120_033828_policy/metrics.csv
+statuses: 75x OK
+
+  n   k  runs   reached  coll  (obst/drone)  euclid(m)  travel(m)   ratio  ratio+   sim(s)  wall(s)    rtf   cpu(s)  ctrl(s)  ram(MB)  ctrl ram
+-----------------------------------------------------------------------------------------------------------------------------------------------
+  4   1     5       5/5   0.0       0.0/0.0       21.5       24.4   1.139   1.139     30.1     38.1   1.00       31      4.5      593       542
+  4   2     5     10/10   0.0       0.0/0.0       37.6       42.5   1.133   1.133     30.6     40.8   0.99       68     11.8     1057      1105
+  4   3     5     15/15   0.0       0.0/0.0       53.3       62.4   1.171   1.171     31.0     43.4   0.99      123     23.2     1634      1690
+  8   1     5       5/5   0.0       0.0/0.0       21.5       24.8   1.149   1.149     30.5     38.6   1.00       31      4.5      596       542
+  8   2     5     10/10   0.0       0.0/0.0       37.6       44.0   1.170   1.170     30.9     41.5   0.99       71     12.1     1060      1105
+  8   3     5     15/15   0.0       0.0/0.0       53.3       63.3   1.190   1.190     31.2     43.5   0.99      123     23.4     1634      1690
+ 12   1     5       5/5   0.0       0.0/0.0       21.5       25.1   1.171   1.171     30.4     39.2   0.98       32      4.8      608       541
+ 12   2     5     10/10   0.0       0.0/0.0       37.6       44.3   1.182   1.182     31.4     41.4   1.00       71     12.3     1072      1106
+ 12   3     5     15/15   0.0       0.0/0.0       53.3       65.3   1.227   1.227     32.2     45.0   0.99      128     24.1     1647      1689
+ 16   1     5       5/5   0.0       0.0/0.0       21.5       25.6   1.197   1.197     31.3     39.4   1.00       32      4.8      620       542
+ 16   2     5     10/10   0.0       0.0/0.0       37.6       44.5   1.186   1.186     31.5     41.6   1.00       72     12.5     1084      1106
+ 16   3     5     14/15   0.2       0.2/0.0       53.3       65.9   1.237   1.275     33.3     47.7   0.99      136     23.8     1655      1689
+ 20   1     5       5/5   0.0       0.0/0.0       21.5       27.5   1.283   1.283     33.0     41.7   1.00       35      5.1      631       542
+ 20   2     5     10/10   0.0       0.0/0.0       37.6       46.1   1.226   1.226     32.3     42.4   1.00       75     12.9     1095      1106
+ 20   3     5     13/15   0.4       0.4/0.0       53.3       91.7   1.772   1.283     62.4     75.6   0.99      214     33.7     1664      1691
+
+memory in MB, shared pages divided among the processes that share them
+  n   k  runs   gazebo      px4   mavros  helpers  mission  monitor    total  resident  free drop
+-------------------------------------------------------------------------------------------------
+  4   1     5      170       10      203      102      405       53      943      1134        721
+  4   2     5      184       15      504      151      702      109     1665      2162       1434
+  4   3     5      201       20      916      200     1008      173     2518      3324       2269
+  8   1     5      174       10      203      102      405       53      947      1138        709
+  8   2     5      188       15      503      151      703      109     1669      2165       1437
+  8   3     5      204       20      912      200     1005      173     2515      3324       2278
+ 12   1     5      185       10      203      102      405       53      959      1149        742
+ 12   2     5      200       15      504      151      702      109     1681      2178       1454
+ 12   3     5      216       20      914      200     1004      173     2526      3336       2247
+ 16   1     5      197       10      203      102      405       53      970      1162        730
+ 16   2     5      211       15      504      151      702      109     1692      2189       1455
+ 16   3     5      228       20      910      200     1007      174     2538      3344       2261
+ 20   1     5      209       10      203      102      403       53      981      1173        743
+ 20   2     5      223       15      504      151      700      109     1702      2201       1480
+ 20   3     5      239       20      907      200     1003      173     2543      3355       2267
+25 runs -> runs3d/batch_20261120_033828_k4_policy/metrics.csv
+statuses: 25x OK
+
+  n   k  runs   reached  coll  (obst/drone)  euclid(m)  travel(m)   ratio  ratio+   sim(s)  wall(s)    rtf   cpu(s)  ctrl(s)  ram(MB)  ctrl ram
+-----------------------------------------------------------------------------------------------------------------------------------------------
+  4   4     5     20/20   0.0       0.0/0.0       72.3       85.1   1.177   1.177     31.7     56.3   0.82      201     33.9     2328      2289
+  8   4     5     19/20   0.2       0.2/0.0       72.3       88.9   1.230   1.235     34.8     60.5   0.82      212     35.7     2333      2289
+ 12   4     5     19/20   0.2       0.2/0.0       72.3       91.2   1.265   1.277     35.5     59.4   0.86      208     35.4     2347      2287
+ 16   4     5     18/20   0.4       0.4/0.0       72.3       91.8   1.273   1.293     35.6     60.5   0.83      210     35.9     2360      2287
+ 20   4     5     16/20   0.8       0.8/0.0       72.3       93.4   1.293   1.359     35.5     59.4   0.83      203     36.8     2373      2289
+
+memory in MB, shared pages divided among the processes that share them
+  n   k  runs   gazebo      px4   mavros  helpers  mission  monitor    total  resident  free drop
+-------------------------------------------------------------------------------------------------
+  4   4     5      218       25     1440      250     1312      247     3492      4617       3297
+  8   4     5      222       25     1443      250     1315      247     3502      4622       3298
+ 12   4     5      233       25     1445      250     1314      247     3515      4635       3314
+ 16   4     5      245       25     1446      250     1311      247     3525      4647       3328
+ 20   4     5      257       25     1447      250     1313      248     3540      4663       3325
+Gazebo against MuJoCo, 2026-11-20 10:46:53
+policy /mnt/hgfs/thesis/anticollision/results/2026-11-15_swarm_sweep/model/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+flown in the mujoco model with a decision every 0.104 s
+Gazebo results: px4/runs3d/batch_20261120_033828_policy/drones.csv, px4/runs3d/batch_20261120_033828_k4_policy/drones.csv
+
+1. Outcomes, the same drone in the same scenario
+
+     k  drones   both  Gazebo only  MuJoCo only  neither   arrived Gazebo / MuJoCo   McNemar p
+     1      25     25            0            0        0        25 / 25               1.000
+     2      50     46            4            0        0        50 / 46               0.125
+     3      75     70            2            0        3        72 / 70               0.500
+     4     100     91            1            2        6        92 / 93               1.000
+    all     250    232            7            2        9       239 / 234              0.180
+
+    drones that differ:
+      n8_k2_s2 drone 1: Gazebo reached (closest 0.07 m), MuJoCo collided (closest -0.01 m)
+      n12_k2_s2 drone 1: Gazebo reached (closest 0.09 m), MuJoCo collided (closest -0.01 m)
+      n16_k2_s2 drone 1: Gazebo reached (closest 0.17 m), MuJoCo collided (closest -0.00 m)
+      n20_k2_s3 drone 1: Gazebo reached (closest 0.32 m), MuJoCo collided (closest -0.00 m)
+      n16_k3_s2 drone 1: Gazebo reached (closest 0.01 m), MuJoCo collided (closest -0.01 m)
+      n20_k3_s2 drone 1: Gazebo reached (closest 0.02 m), MuJoCo collided (closest -0.00 m)
+      n12_k4_s3 drone 1: Gazebo reached (closest 0.07 m), MuJoCo collided (closest -0.00 m)
+      n20_k4_s1 drone 2: Gazebo destroyed (closest -0.01 m), MuJoCo reached (closest 0.13 m)
+      n20_k4_s4 drone 3: Gazebo destroyed (closest -0.01 m), MuJoCo reached (closest 0.11 m)
+
+2. Following the commands (velocity flown between two decisions against the
+   velocity asked for, and the position error after 1 s)
+
+    MuJoCo   velocity error  median 0.151  95% 0.578  largest 1.794 m/s   (46,279 intervals)
+             after 1 s       median 0.143  95% 0.459  largest 1.142 m
+    Gazebo   velocity error  median 0.167  95% 0.656  largest 2.080 m/s   (29,841 intervals)
+             after 1 s       median 0.101  95% 0.455  largest 1.370 m
+             150 drones from px4/runs3d/batch_20261120_033828_policy, decision every 0.104 s (median, 0.104 to 0.104)
+    Gazebo   velocity error  median 0.195  95% 0.646  largest 2.079 m/s   (19,183 intervals)
+             after 1 s       median 0.119  95% 0.440  largest 1.037 m
+             100 drones from px4/runs3d/batch_20261120_033828_k4_policy, decision every 0.104 s (median, 0.104 to 0.104)
+
+took 1.1 min
+report written to /mnt/hgfs/thesis/anticollision/rl/logs/compare_fixed_timing.txt
+shield checks 2026-11-20 10:48:02
+settings: margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s (default)
+
+--- 1 hand-worked cases (default settings) ---
+    ok   nothing near: unchanged (+1.00, +0.00, +0.00)
+    ok   wall 1.22 m ahead, stops 0.52 m on, 0.35 m left: unchanged (+1.00, +0.00, +0.00)
+    ok   wall 1.10 m ahead, full speed would leave 0.23 m; at 0.75 it stops 0.39 m on and leaves 0.36 m: changed (+0.75, +0.00, +0.00)
+    ok   box beside the path, 0.40 m from the drone: unchanged (+1.00, +0.00, +0.00)
+    ok   straight down from 1.2 m: full speed ends 0.265 m above the ground, at 0.75 it ends 0.411 m above: changed (+0.00, +0.00, -0.75)
+    ok   edge of the area at 15 m, from x = 14.0: stops at 14.52: unchanged (+1.00, +0.00, +0.00)
+    ok   edge of the area at 15 m, from x = 14.3: stops at 14.82: changed (+0.75, +0.00, +0.00)
+    ok   drone coming head on from 4 m: the command changes and the predicted pass is wider: changed (-0.23, +0.06, -0.06), closest 0.46 m -> 1.11 m
+    ok   drone flying alongside 5 m away: unchanged (+1.00, +0.00, +0.00)
+    ok   already 0.10 m from a wall: nothing is safe, so it must not get closer, and hovering is the closest such command: no_safe (+0.00, +0.00, +0.00), closest 0.100 m
+    ok   boxed in with 0.05 m to spare on every side: only hovering is safe: hover (+0.00, +0.00, +0.00)
+    ok   flying at a wall 1.08 m ahead, just far enough to brake: a safe command is found: hover (+0.00, +0.00, +0.00), closest 0.310 m
+PASS  (0.0 s)
+
+--- 2 the guarantee in the model, decision every 0.104 s ---
+    60 flights (20 to the target, of which 17 arrived; the rest random or aiming at the nearest box), 15,626 decisions
+    commands changed 1534, hover 5442, no safe command 0
+    closest any drone came to a box, the ground or the edge: 0.300 m (margin 0.30 m)
+PASS  (41.3 s)
+
+--- 2 the guarantee in the model, decision period varying by up to 12% (checked for 20%) ---
+    60 flights (20 to the target, of which 18 arrived; the rest random or aiming at the nearest box), 15,699 decisions
+    commands changed 1401, hover 5613, no safe command 0
+    closest any drone came to a box, the ground or the edge: 0.300 m (margin 0.30 m)
+PASS  (41.0 s)
+
+--- 3 the model against MuJoCo and Gazebo flights ---
+    mujoco, 1 and 3 drones: 100 drones, 18,624 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.036  0.130  0.429              0.086  0.284  0.800
+       0.30        0.025  0.093  0.323              0.066  0.224  0.666
+       0.40        0.018  0.067  0.248              0.051  0.173  0.546  <- settings
+       0.50        0.014  0.049  0.192              0.041  0.134  0.444
+       0.60        0.011  0.037  0.151              0.034  0.102  0.359
+    Gazebo, batch_20261120_033828_shield: 149 drones, 30,083 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.038  0.141  0.410              0.071  0.285  0.684
+       0.30        0.034  0.111  0.322              0.064  0.234  0.551
+       0.40        0.033  0.101  0.277              0.060  0.213  0.484  <- settings
+       0.50        0.033  0.098  0.275              0.059  0.209  0.544
+       0.60        0.033  0.100  0.289              0.061  0.217  0.607
+    Gazebo, batch_20261120_033828_k4_shield: 100 drones, 24,167 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.053  0.255  0.582              0.104  0.486  0.842
+       0.30        0.047  0.205  0.515              0.093  0.406  0.754
+       0.40        0.045  0.180  0.503              0.087  0.362  0.727  <- settings
+       0.50        0.045  0.169  0.519              0.086  0.344  0.714
+       0.60        0.046  0.166  0.532              0.088  0.348  0.708
+    Gazebo, batch_20261120_033828_policy: 150 drones, 29,991 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.037  0.139  0.630              0.070  0.282  1.342
+       0.30        0.034  0.109  0.595              0.063  0.232  1.340
+       0.40        0.032  0.097  0.597              0.059  0.208  1.338  <- settings
+       0.50        0.032  0.095  0.598              0.058  0.204  1.337
+       0.60        0.033  0.099  0.599              0.059  0.215  1.337
+    Gazebo, batch_20261120_033828_k4_policy: 100 drones, 19,283 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.045  0.141  0.482              0.086  0.275  0.742
+       0.30        0.042  0.114  0.389              0.079  0.226  0.616
+       0.40        0.040  0.104  0.324              0.074  0.208  0.510  <- settings
+       0.50        0.040  0.103  0.277              0.073  0.204  0.444
+       0.60        0.040  0.104  0.254              0.074  0.211  0.484
+    (metres; the guarantee needs the error to stay below the margin, 0.30 m)
+PASS  (60.7 s)
+
+--- 4 the policy without and with the shield, Gazebo scenarios in mujoco ---
+    policy /mnt/hgfs/thesis/anticollision/results/2026-11-15_swarm_sweep/model/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+    shield margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s, holds 0.083, 0.104, 0.125, 0.500 s
+     k                   drones reached  box drone other timeout   changed  hover no safe  time (s)  ms/check
+     1  policy               25      25    0     0     0       0        -      -       0      22.2         -
+     1  policy + shield      25      25    0     0     0       0      0.0%    0.0%       0      22.2      0.06
+     2  policy               50      46    4     0     0       0        -      -       0      19.7         -
+     2  policy + shield      50      50    0     0     0       0      0.8%    0.0%       3      19.6      0.09
+     3  policy               75      70    5     0     0       0        -      -       0      19.2         -
+     3  policy + shield      75      75    0     0     0       0      1.2%    0.0%       9      19.2      0.11
+     4  policy              100      93    7     0     0       0        -      -       0      20.0         -
+     4  policy + shield     100      97    0     0     0       3      4.4%    0.0%      20      20.5      0.16
+    (box, drone, other: crashes into a box, into another drone, and into the ground or out of the area; time: mean flight time of the drones that arrived)
+PASS  (137.6 s)
+
+all checks passed
+
+report written to /mnt/hgfs/thesis/anticollision/rl/logs/check_shield.txt

@@ -1,0 +1,38 @@
+Gazebo against MuJoCo, 2026-11-20 10:46:53
+policy /mnt/hgfs/thesis/anticollision/results/2026-11-15_swarm_sweep/model/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+flown in the mujoco model with a decision every 0.104 s
+Gazebo results: px4/runs3d/batch_20261120_033828_policy/drones.csv, px4/runs3d/batch_20261120_033828_k4_policy/drones.csv
+
+1. Outcomes, the same drone in the same scenario
+
+     k  drones   both  Gazebo only  MuJoCo only  neither   arrived Gazebo / MuJoCo   McNemar p
+     1      25     25            0            0        0        25 / 25               1.000
+     2      50     46            4            0        0        50 / 46               0.125
+     3      75     70            2            0        3        72 / 70               0.500
+     4     100     91            1            2        6        92 / 93               1.000
+    all     250    232            7            2        9       239 / 234              0.180
+
+    drones that differ:
+      n8_k2_s2 drone 1: Gazebo reached (closest 0.07 m), MuJoCo collided (closest -0.01 m)
+      n12_k2_s2 drone 1: Gazebo reached (closest 0.09 m), MuJoCo collided (closest -0.01 m)
+      n16_k2_s2 drone 1: Gazebo reached (closest 0.17 m), MuJoCo collided (closest -0.00 m)
+      n20_k2_s3 drone 1: Gazebo reached (closest 0.32 m), MuJoCo collided (closest -0.00 m)
+      n16_k3_s2 drone 1: Gazebo reached (closest 0.01 m), MuJoCo collided (closest -0.01 m)
+      n20_k3_s2 drone 1: Gazebo reached (closest 0.02 m), MuJoCo collided (closest -0.00 m)
+      n12_k4_s3 drone 1: Gazebo reached (closest 0.07 m), MuJoCo collided (closest -0.00 m)
+      n20_k4_s1 drone 2: Gazebo destroyed (closest -0.01 m), MuJoCo reached (closest 0.13 m)
+      n20_k4_s4 drone 3: Gazebo destroyed (closest -0.01 m), MuJoCo reached (closest 0.11 m)
+
+2. Following the commands (velocity flown between two decisions against the
+   velocity asked for, and the position error after 1 s)
+
+    MuJoCo   velocity error  median 0.151  95% 0.578  largest 1.794 m/s   (46,279 intervals)
+             after 1 s       median 0.143  95% 0.459  largest 1.142 m
+    Gazebo   velocity error  median 0.167  95% 0.656  largest 2.080 m/s   (29,841 intervals)
+             after 1 s       median 0.101  95% 0.455  largest 1.370 m
+             150 drones from px4/runs3d/batch_20261120_033828_policy, decision every 0.104 s (median, 0.104 to 0.104)
+    Gazebo   velocity error  median 0.195  95% 0.646  largest 2.079 m/s   (19,183 intervals)
+             after 1 s       median 0.119  95% 0.440  largest 1.037 m
+             100 drones from px4/runs3d/batch_20261120_033828_k4_policy, decision every 0.104 s (median, 0.104 to 0.104)
+
+took 1.1 min

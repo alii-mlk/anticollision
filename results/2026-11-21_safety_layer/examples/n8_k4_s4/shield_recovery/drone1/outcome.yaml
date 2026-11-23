@@ -1,0 +1,5 @@
+destroyed: false
+min_clearance: 0.763
+min_drone_distance: 7.962
+samples: 950
+last_world_position: {x: 6.140, y: -6.581, z: 27.739}

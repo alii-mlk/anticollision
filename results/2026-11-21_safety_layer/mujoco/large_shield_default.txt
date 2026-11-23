@@ -1,0 +1,27 @@
+large evaluation 2026-11-20 07:05:35, mujoco flight model, 400 mazes per number of drones, seeds from 300000, decision every 0.104 s
+shield: margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s (default)
+
+ k  policy                 flights  reached              crashed               timeout hit drone  ratio clearance
+-----------------------------------------------------------------------------------------------------------------
+ 1  model/final + shield       400   99.0% [97.5, 99.6]    0.0% [ 0.0,  1.0]      1.0%         0  1.140     1.01m
+    shield: changed 1.8% of 75,545 decisions, hover 0.6%, no safe command 143 times
+
+ 2  model/final + shield       800   98.8% [97.7, 99.3]    0.0% [ 0.0,  0.5]      1.2%         0  1.146     1.04m
+    shield: changed 1.4% of 152,742 decisions, hover 0.8%, no safe command 136 times
+
+ 3  model/final + shield      1200   99.3% [98.7, 99.7]    0.0% [ 0.0,  0.3]      0.7%         0  1.145     1.03m
+    shield: changed 1.1% of 226,638 decisions, hover 0.1%, no safe command 134 times
+
+ 4  model/final + shield      1600   99.1% [98.5, 99.5]    0.0% [ 0.0,  0.2]      0.9%         0  1.152     1.06m
+    shield: changed 1.2% of 305,882 decisions, hover 0.2%, no safe command 198 times
+
+ 6  model/final + shield      2400   98.9% [98.4, 99.3]    0.0% [ 0.0,  0.2]      1.1%         0  1.157     1.06m
+    shield: changed 1.5% of 463,280 decisions, hover 0.3%, no safe command 570 times
+
+ 8  model/final + shield      3200   99.5% [99.2, 99.7]    0.0% [ 0.0,  0.1]      0.5%         0  1.171     1.02m
+    shield: changed 1.5% of 618,490 decisions, hover 0.2%, no safe command 711 times
+
+10  model/final + shield      4000   99.2% [98.9, 99.5]    0.0% [ 0.0,  0.1]      0.8%         0  1.164     1.04m
+    shield: changed 1.6% of 771,771 decisions, hover 0.2%, no safe command 1008 times
+
+took 28.8 min

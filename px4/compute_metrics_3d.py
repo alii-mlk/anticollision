@@ -148,6 +148,12 @@ def collect_drones(batch_dir):
                 "collided_with": hit.strip(),
                 "controller_cpu_time": to_float(mission.get("cpu_time"), None),
                 "decisions": to_float(mission.get("policy_decisions"), None),
+                # Recorded since 2026-11-19; empty for older runs.
+                "decision_period": to_float(mission.get("decision_period"), None),
+                "shield_changed": to_float(mission.get("shield_changed"), None),
+                "shield_hover": to_float(mission.get("shield_hover"), None),
+                "shield_no_safe": to_float(mission.get("shield_no_safe"), None),
+                "recovery_decisions": to_float(mission.get("recovery_decisions"), None),
             })
     return rows
 

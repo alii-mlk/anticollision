@@ -1,0 +1,16 @@
+outcome: reached
+controller: policy
+policy: /mnt/hgfs/thesis/anticollision/rl/runs/swarm_4/final.zip
+policy_decisions: 313
+decision_period: 0.1042
+cpu_time: 10.36
+euclidean_distance: 30.727
+travelled_distance: 35.690
+ratio: 1.162
+simulation_time: 40.55
+wall_time: 41.80
+real_time_factor: 0.970
+clock_source: gazebo
+sim_start: 64.58
+final_world_position: {x: -10.898, y: -9.480, z: 7.099}
+target_world_position: {x: -10.643, y: -9.963, z: 7.013}

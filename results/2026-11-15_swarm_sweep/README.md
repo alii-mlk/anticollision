@@ -42,7 +42,8 @@ mazes than the ones it was chosen on.
 
 ## Results in MuJoCo
 
-400 new mazes per drone count (seeds from 300000), with 0 to 20 obstacles.
+400 new mazes per drone count (seeds from 300000), with 4, 8, 12, 16 or 20
+obstacles as in the Gazebo sweep.
 From `mujoco/large_swarm_scaling.txt` and `large_swarm_scaling_2.txt`:
 
 | drones | straight | trained alone | final policy |
@@ -97,7 +98,10 @@ because a scenario has only 1 to 4 drones, so its share moves in steps of 25
 to 100 points.
 
 MuJoCo predicted Gazebo closely: on the 25 one-drone scenarios 25 arrivals in
-both, on the 75 three-drone flights 70 in MuJoCo and 72 in Gazebo.
+both, on the 50 two-drone flights 46 in MuJoCo and 50 in Gazebo, on the 75
+three-drone flights 70 and 72. Stage 5 compares the two simulators drone by
+drone (`results/2026-11-21_safety_layer/`): the same outcome for 240 of the
+250 drones.
 
 ### Path, time and clearance
 
@@ -135,9 +139,13 @@ when its clock started (`sim_start`), so later runs give the exact value.
 
 Processor time of the simulator, PX4 and MAVROS, in cores busy: 0.83, 1.73,
 2.61 and 3.43 for 1 to 4 drones with the final policy, about the same as
-flying straight. The mission node with the policy (lidar and network every
-0.104 s) uses 12% of a core with one drone and 25% per drone with four,
-against 8 to 13% flying straight.
+flying straight. The mission node with the policy (lidar and network) uses 12%
+of a core with one drone and 25% per drone with four, against 8 to 13% flying
+straight. In these runs the policy decided every 0.15 s and not every 0.104 s
+as in training: the node only checked on its 20 Hz timer, so a decision
+waited for every third tick. This was found and fixed in stage 5, where the
+policy decides 44% more often and its node uses about a quarter more
+processor time.
 
 Memory, measured on 2026-11-16 in `ram_straight/` and `ram_policy/` (one run
 per obstacle count, averaged), in MB:
@@ -167,7 +175,9 @@ The obstacles add about 10 MB per 4 obstacles, in Gazebo.
   predicted the Gazebo results within a few drones.
 - There is no guarantee of avoidance, only measured rates: no drone to drone
   contact in 13,600 MuJoCo flights and 225 Gazebo flights with more than one
-  drone, and crashes in 3 to 6% of the MuJoCo flights.
+  drone, and crashes in 3 to 6% of the MuJoCo flights. Stage 5 adds a safety
+  layer and a recovery around this policy, see
+  `results/2026-11-21_safety_layer/`.
 - One training run. Another seed could give a somewhat different policy.
 - An earlier memory batch (`px4/runs3d/batch_20261116_121949_policy`) is not
   used: from its 7th run on, 241 MB that were not part of the stack were
@@ -207,6 +217,6 @@ python3 results/make_tables.py
 python results/make_figures.py
 ```
 
-The first runs anywhere and writes `results/thesis/tables.txt`. The second
-needs matplotlib, so it runs in the VM after `source rl/env.sh`, and writes
-`results/thesis/figures/`.
+The first runs anywhere and writes `results/tables/`. The second needs
+matplotlib, so it runs in the VM after `source rl/env.sh`, and writes
+`results/figures/`.

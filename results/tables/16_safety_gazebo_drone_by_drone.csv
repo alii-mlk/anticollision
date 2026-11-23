@@ -1,0 +1,12 @@
+drones,final policy,with layer,with layer and recovery,flights
+1,arrived,arrived,arrived,25
+2,arrived,arrived,arrived,50
+3,arrived,arrived,arrived,72
+3,crashed,arrived,arrived,2
+3,crashed,timed out,arrived,1
+1 to 3,arrived,arrived,arrived,147
+1 to 3,crashed,arrived,arrived,2
+1 to 3,crashed,timed out,arrived,1
+4,arrived,arrived,arrived,92
+4,crashed,arrived,arrived,5
+4,crashed,timed out,arrived,3

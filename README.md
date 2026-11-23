@@ -1,6 +1,6 @@
 # anticollision
 
-Collision avoidance for drones, in simulation. The work went through four
+Collision avoidance for drones, in simulation. The work went through five
 stages, each building on the one before:
 
 1. Nav2 in 2D: a quadcopter flies around obstacles with the ROS 2 navigation
@@ -15,15 +15,20 @@ stages, each building on the one before:
 4. One policy for many drones: the same kind of network, trained with many
    drones in the maze and told about its nearest neighbours, so the drones
    also avoid each other.
+5. A safety layer and a recovery: every command of the policy is checked
+   before it is sent and replaced when the drone could not stop in time, and a
+   drone that gets stuck climbs over the obstacles. No drone crashed in any of
+   the final tests.
 
 ## How the repository is organised
 
 ```
 nav2/                  stage 1: Nav2 in 2D
-px4/                   stages 2 to 4 in Gazebo: starting PX4 and the drones,
+px4/                   stages 2 to 5 in Gazebo: starting PX4 and the drones,
                        scenarios, missions, collision monitor, sweeps, metrics
-rl/                    stages 3 and 4: lidar, training environments, training
-                       and evaluation of the policy
+rl/                    stages 3 to 5: lidar, training environments, training
+                       and evaluation of the policy, the safety layer and the
+                       recovery
 results/               one folder per experiment, plus the tables and figures
                        for the thesis (results/README.md lists them)
 early_versions/        the first experiments, before stage 1, kept for history
@@ -34,7 +39,7 @@ Every script starts with a comment or docstring that says what it does and
 how to run it. The list of all files with one line each is in
 [Files](#files) below.
 
-How a Gazebo experiment goes through the scripts (stages 2 to 4, all in
+How a Gazebo experiment goes through the scripts (stages 2 to 5, all in
 `px4/`):
 
 ```
@@ -42,9 +47,9 @@ gen_scenario_3d.py        n obstacles and k drones from a seed -> scenario.yaml
 run_batch_3d.py           for every (n, k, seed):
   start_px4_multi.sh        Gazebo, one PX4 and one MAVROS per drone
   spawn_obstacles.py        puts the boxes into the world
-  run_multi_mission.py      per drone: run_mission.py (flies it, straight or
-                            with --policy) and collision_monitor_3d.py
-                            (destroys it on contact)
+  run_multi_mission.py      per drone: run_mission.py (flies it, straight, with
+                            --policy, and with --shield and --recovery) and
+                            collision_monitor_3d.py (destroys it on contact)
                           -> runs3d/batch_<time>/
 compute_metrics_3d.py     -> metrics.csv, drones.csv, summary.txt
 compare_sweeps_3d.py      a straight batch against a policy batch
@@ -62,6 +67,11 @@ evaluate.py,              checks in MuJoCo, and the large evaluation on
 check_swarm.py,             hundreds of new mazes
 evaluate_large.py
 policy.py                 loads a trained model for px4/run_mission.py --policy
+shield.py, recovery.py    the safety layer and the recovery (stage 5), the same
+                          code in MuJoCo and in Gazebo
+check_shield.py,          their checks, the comparison of the two simulators,
+compare_simulators.py,      and the evolution strategy for the layer's settings
+tune_shield.py
 ```
 
 ## Results
@@ -184,8 +194,39 @@ obstacles and to other drones. Details are in
   load PyTorch. The simulator side uses about the same processor time as
   flying straight. Four drones is the most the VM can simulate at full speed.
 
+### Stage 5: a safety layer and a recovery
+
+After stage 4 the professor asked for no crashes, and for an explanation of
+why Gazebo and MuJoCo give different results. Details are in
+`results/2026-11-21_safety_layer/README.md`.
+
+- The policy decided every 0.15 s in Gazebo instead of every 0.104 s as in
+  training (the mission node only checked on its 20 Hz timer). Fixed; it made
+  no difference to the results.
+- Gazebo against MuJoCo: the 250 drones of the Gazebo scenarios flown again in
+  MuJoCo have the same outcome in 241 cases. The drones that differ pass a
+  box within centimetres in one simulator, and the Gazebo sets are small.
+- The safety layer (`rl/shield.py`) predicts, for every command, where the
+  drone goes if it flies it and then brakes, and replaces it when the drone
+  would come within 0.30 m of an obstacle or 0.40 m of another drone. In its
+  model of the drone this guarantees that it never touches an obstacle.
+- The recovery (`rl/recovery.py`): a drone that has not come closer to its
+  target for 8 s climbs over the boxes, flies level and descends onto its
+  target, still through the layer.
+- Final tests with both: in MuJoCo all 13,600 flights arrived (the policy
+  alone: 95.2%, 589 crashes), in Gazebo all 150 drones of the 75 scenarios and
+  all 100 of the 25 with 4 drones (the policy alone: 3 and 8 crashes). Flights
+  that arrived anyway are 0.1 s longer on average.
+- 15 and 20 drones in the same area (MuJoCo only): the policy alone still
+  arrives in about 95% of the flights but touched other drones for the first
+  time (15 contacts in 14,000 flights); with the layer and the recovery all
+  14,000 arrived, with no crash and no contact.
+- An evolution strategy (Salimans et al. 2017) on the layer's four settings
+  found nothing better than the chosen ones on ordinary mazes.
+
 `results/make_tables.py` and `results/make_figures.py` make the tables and
-figures for the thesis from the result folders, into `results/thesis/`.
+figures for the thesis from the result folders, into `results/tables/` and
+`results/figures/`.
 
 ## How the pieces fit together
 
@@ -199,6 +240,8 @@ Stage 3:  lidar + policy network -> velocity setpoint -> MAVROS -> MAVLink -> PX
           (trained beforehand in MuJoCo, with the same lidar code)
 Stage 4:  the same, with the 3 nearest drones' position and velocity as extra
           inputs (published by the collision monitors), trained with many drones
+Stage 5:  lidar + policy network -> recovery when stuck -> safety layer ->
+          velocity setpoint -> MAVROS -> MAVLink -> PX4 -> Gazebo
 ```
 
 In stage 2 the four programs are:
@@ -210,9 +253,11 @@ In stage 2 the four programs are:
 | MAVROS | the translator between PX4's MAVLink protocol and ROS 2 |
 | my Python nodes | the planner: chooses the target, watches for collisions, records the metrics |
 
-Stages 3 and 4 only change the planner. `run_mission.py --policy` replaces the
-straight-line setpoint with the network's direction. Everything else, from the
-scenarios to the collision monitor and the metrics, is the same code.
+Stages 3 to 5 only change the planner. `run_mission.py --policy` replaces the
+straight-line setpoint with the network's direction, and `--shield` and
+`--recovery` add the safety layer and the recovery in front of it. Everything
+else, from the scenarios to the collision monitor and the metrics, is the
+same code.
 
 ## Requirements
 
@@ -240,7 +285,7 @@ Stage 2 (PX4) also needs:
   from `/uavN/...` to `/uavN/mavros/...`, so the nodes look the prefix up
   (`px4/mavros_ns.py`).
 
-Stages 3 and 4 (RL) also need:
+Stages 3 to 5 (RL) also need:
 
 - a Python venv at `~/rlenv` with MuJoCo, Gymnasium, Stable-Baselines3,
   PyTorch (CPU build) and MuJoCo-Drones-Gym, made by `rl/setup_env.sh`. Every
@@ -280,7 +325,7 @@ nav2/                         STAGE 1: Nav2 in 2D
   run_batch.sh                unattended sweep over N obstacles and seeds -> runs/
   compute_metrics.py          a batch folder -> metrics.csv, summary and plots
 
-px4/                          STAGES 2 TO 4: PX4 and MAVLink in 3D
+px4/                          STAGES 2 TO 5: PX4 and MAVLink in 3D
   FEASIBILITY_3D_NAVIGATION.md  why PX4 has no usable 3D planner, with sources
   start_px4_sitl.sh           starts Gazebo and PX4 for one drone, with the heartbeat
   start_px4_multi.sh          the same for k drones: k PX4 instances in one Gazebo world,
@@ -293,13 +338,15 @@ px4/                          STAGES 2 TO 4: PX4 and MAVLink in 3D
   spawn_obstacles.py          puts those boxes into the running Gazebo world
   run_mission.py              flies one drone to its target with offboard setpoints and
                               records distances, ratio and time; --policy flies it with
-                              the trained network
+                              the trained network, --shield and --recovery add the
+                              safety layer and the recovery
   collision_monitor_3d.py     checks one drone against the obstacles and the other drones,
                               destroys it on contact, publishes its position and velocity
                               for the others, records its closest distance to another drone
   run_multi_mission.py        a whole scenario: k missions and k monitors, then the summary
   run_batch_3d.py             unattended sweep over (n, k, seed) -> runs3d/batch_<time>/,
-                              with CPU time and memory measured during every flight
+                              with CPU time and memory measured during every flight;
+                              --runs flies a list of runs instead of the grid
   compute_metrics_3d.py       a batch folder -> metrics.csv (per run), drones.csv (per
                               drone) and the tables per (n, k)
   compare_sweeps_3d.py        a straight batch against a policy batch: per configuration,
@@ -311,7 +358,7 @@ px4/                          STAGES 2 TO 4: PX4 and MAVLink in 3D
   collect_diagnostics.sh      collects everything needed to debug a bad run into logs/
   offboard_goto.py            the first offboard flight to one 3D point, to test the bridge
 
-rl/                           STAGES 3 AND 4: the policy
+rl/                           STAGES 3 TO 5: the policy, the safety layer, the recovery
   setup_env.sh                one-time setup of the venv ~/rlenv
   env.sh                      source it in every RL terminal: ROS first, then the venv
   smoke_test.py               checks every part of the toolchain on its own
@@ -335,13 +382,28 @@ rl/                           STAGES 3 AND 4: the policy
   evaluate.py                 flies the 25 single-drone scenarios in MuJoCo through
                               policy.py and checks its input against training
   evaluate_large.py           flies policies on hundreds of new mazes per drone count,
-                              with 95% intervals
+                              with 95% intervals; --shield and --recovery add the layer
+                              and the recovery, --mazes-from flies only the mazes where
+                              something went wrong before, --redraw gives a maze that
+                              cannot be built for many drones a new seed
   diagnose_crashes.py         where a policy hits obstacles and what its lidar showed
+  compare_simulators.py       the Gazebo scenarios flown again in MuJoCo, drone by drone,
+                              and how closely each simulator follows the commands
+  shield.py                   the safety layer: checks every command and replaces it
+                              when the drone could not stop in time (stage 5)
+  recovery.py                 a stuck drone climbs over the boxes, flies level and
+                              descends onto its target (stage 5)
+  check_shield.py             cases worked out by hand, the guarantee in the model, the
+                              model against real flights, the layer on the Gazebo
+                              scenarios
+  tune_shield.py              the evolution strategy for the layer's four settings
 
 results/                      one folder per experiment (see results/README.md)
-  make_tables.py              the thesis tables from the result folders -> results/thesis/
+  make_tables.py              the thesis tables from the result folders -> results/tables/
   make_figures.py             the thesis figures (needs matplotlib, run it in the venv)
-  thesis/                     the tables and figures
+                              -> results/figures/
+  tables/                     every table as CSV, and all of them as text in all_tables.txt
+  figures/                    every figure as PDF and PNG
 ```
 
 The folders `nav2/logs`, `nav2/scenarios`, `nav2/runs`, `px4/logs`,
@@ -772,7 +834,7 @@ success, so nothing showed the failure.
   simulator that falls behind unevenly, because the autopilot then thinks its
   sensors have failed.
 
-## Running stages 3 and 4: the policy
+## Running stages 3 to 5: the policy
 
 Everything runs in the VM, from the repository root unless noted. Once:
 
@@ -866,6 +928,41 @@ sweeps, from `px4/` after `source ../rl/env.sh`:
 ./run_batch_3d.py --n 4 8 12 16 20 --k 4 --seeds 1 2 3 4 5 --timeout 180
 ```
 
+### Stage 5: the safety layer and the recovery
+
+The checks, then the large evaluation with both, from the repository root:
+
+```bash
+python rl/check_shield.py
+python rl/evaluate_large.py rl/runs/swarm_4/final.zip --shield default --shield-only --recovery --no-straight --drones 1 2 3 4 6 8 10 --mazes 400 --first-seed 300000 --name final_recovery
+```
+
+With 15 and 20 drones the generator cannot build many of the mazes, so
+`--redraw` gives those a new seed with the same number of boxes:
+
+```bash
+python rl/evaluate_large.py rl/runs/swarm_4/final.zip --shield default --recovery --no-straight --drones 15 20 --mazes 400 --first-seed 300000 --redraw --name crowd_recovery
+```
+
+`--shield` takes `default` or a JSON file with the four settings (see
+`results/2026-11-21_safety_layer/shield_settings.json`). Without
+`--shield-only` the policy alone is flown on the same mazes too. In Gazebo,
+from `px4/`:
+
+```bash
+./run_batch_3d.py --n 4 8 12 16 20 --k 1 2 3 --seeds 1 2 3 4 5 --timeout 180 --policy ../rl/runs/swarm_4/final.zip --shield default --recovery
+./run_batch_3d.py --n 4 8 12 16 20 --k 4 --seeds 1 2 3 4 5 --timeout 180 --policy ../rl/runs/swarm_4/final.zip --shield default --recovery
+```
+
+The Gazebo scenarios flown again in MuJoCo, drone by drone (after
+`compute_metrics_3d.py` on the batches), and the evolution strategy:
+
+```bash
+python rl/compare_simulators.py --gazebo px4/runs3d/<batch>/drones.csv --gazebo-batch px4/runs3d/<batch> --name fixed_timing
+python rl/tune_shield.py --quick
+python rl/tune_shield.py
+```
+
 Then the tables and figures for the thesis, from the repository root:
 
 ```bash
@@ -895,6 +992,12 @@ python results/make_figures.py
 - PyTorch on ARM: on ARM64 Linux a plain `pip install torch` installs the
   CUDA build, about 9 GB of NVIDIA libraries that the VM cannot use.
   `setup_env.sh` installs from the CPU-only index instead.
+- Decision timing: until 2026-11-19 `run_mission.py` decided only on its 20 Hz
+  setpoint timer, so the policy decided every 0.15 s in Gazebo instead of the
+  0.104 s it was trained with. Since then a 100 Hz timer keeps the decisions on
+  a 0.104 s grid of simulated time, and every `mission.yaml` records the
+  measured `decision_period`. Flown in MuJoCo at 0.146 s the policy does as
+  well as at 0.104 s, so the earlier results are not affected.
 - The stage 3 policy was trained with one drone and static obstacles, so it
   only met other drones in Gazebo. That was one of two possible reasons why
   more drones crash at k = 3 (the other is that the k = 3 mazes are a
@@ -906,9 +1009,11 @@ python results/make_figures.py
 
 Done: the Nav2 baseline (static and moving obstacles), the PX4 baseline over
 (n, k) without avoidance (`results/2026-09-06_3d_sweep/`), the RL policy
-compared with it on the same scenarios (`results/2026-10-19_rl_sweep/`), and
-the policy trained with many drones, evaluated in MuJoCo with up to 10 drones
-and in Gazebo with up to 4 (`results/2026-11-15_swarm_sweep/`).
+compared with it on the same scenarios (`results/2026-10-19_rl_sweep/`), the
+policy trained with many drones, evaluated in MuJoCo with up to 10 drones
+and in Gazebo with up to 4 (`results/2026-11-15_swarm_sweep/`), and the safety
+layer and the recovery around it (`results/2026-11-21_safety_layer/`).
 
-Not done: training at a higher speed (to make the missions shorter), and
-Gazebo runs with more than 4 drones, which need a faster machine than the VM.
+Not done: training at a higher speed (to make the missions shorter), training
+the policy with the safety layer switched on, and Gazebo runs with more than 4
+drones, which need a faster machine than the VM.

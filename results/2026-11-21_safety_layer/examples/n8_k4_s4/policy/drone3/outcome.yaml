@@ -1,0 +1,7 @@
+destroyed: true
+min_clearance: -0.017
+min_drone_distance: 5.064
+samples: 825
+last_world_position: {x: -5.785, y: 1.537, z: 0.007}
+collision_position: {x: -5.183, y: 2.549, z: 3.465}
+collided_with: an obstacle

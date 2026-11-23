@@ -15,9 +15,11 @@ episode, and had never been flown in Gazebo before this. It sees the 82-ray lida
 (`rl/lidar.py`), the direction and distance to the target, its velocity and
 its altitude, and outputs a direction. `run_mission.py --policy` sends that
 direction to PX4 as an offboard velocity setpoint (1.04 m/s level, 1.17 m/s
-climb, the speeds it was trained at), with a new decision every 0.104 s of
-simulated time. Other drones are put into the lidar as cubes at their
-published positions.
+climb, the speeds it was trained at). It was meant to decide every 0.104 s of
+simulated time as in training, but the node only checked on its 20 Hz timer,
+so in these runs it decided every 0.15 s (found and fixed in stage 5, see
+`results/2026-11-21_safety_layer/`). Other drones are put into the lidar as
+cubes at their published positions.
 
 Source batches (gitignored, reproducible from the seeds):
 `px4/runs3d/batch_20261019_105440_straight` (97 minutes) and
@@ -105,7 +107,7 @@ controller averaged 1.70 m/s on the same drones flying straight. The training
 speed came from calibrating the MuJoCo controller (`rl/check_env.py`). A
 faster policy should be possible, but it would have to be trained again.
 
-The controller's own CPU time (lidar plus network, every 0.104 s) is on
+The controller's own CPU time (lidar plus network, every 0.15 s) is on
 average 3.1 to 3.9 s per mission with one drone and 13 to 20 s per run with
 three, depending on the number of obstacles, against about 1 s per drone for
 the straight-line mission node. The total CPU time per

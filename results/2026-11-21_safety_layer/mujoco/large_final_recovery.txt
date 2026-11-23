@@ -1,0 +1,34 @@
+large evaluation 2026-11-20 16:29:57, mujoco flight model, 400 mazes per number of drones, seeds from 300000, decision every 0.104 s
+shield: margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s (default), with the recovery
+
+ k  policy                           flights  reached              crashed               timeout hit drone  ratio clearance
+---------------------------------------------------------------------------------------------------------------------------
+ 1  model/final + shield + recovery      400  100.0% [99.0, 100.0]   0.0% [ 0.0,  1.0]      0.0%         0  1.148     0.99m
+    shield: changed 1.3% of 74,396 decisions, hover 0.0%, no safe command 54 times
+    recovery: needed by 6 drones, 6 of them arrived
+
+ 2  model/final + shield + recovery      800  100.0% [99.5, 100.0]   0.0% [ 0.0,  0.5]      0.0%         0  1.159     1.02m
+    shield: changed 1.0% of 150,244 decisions, hover 0.1%, no safe command 76 times
+    recovery: needed by 22 drones, 22 of them arrived
+
+ 3  model/final + shield + recovery     1200  100.0% [99.7, 100.0]   0.0% [ 0.0,  0.3]      0.0%         0  1.153     1.03m
+    shield: changed 1.0% of 225,051 decisions, hover 0.0%, no safe command 118 times
+    recovery: needed by 18 drones, 18 of them arrived
+
+ 4  model/final + shield + recovery     1600  100.0% [99.8, 100.0]   0.0% [ 0.0,  0.2]      0.0%         0  1.163     1.05m
+    shield: changed 1.0% of 303,308 decisions, hover 0.0%, no safe command 149 times
+    recovery: needed by 37 drones, 37 of them arrived
+
+ 6  model/final + shield + recovery     2400  100.0% [99.8, 100.0]   0.0% [ 0.0,  0.2]      0.0%         0  1.169     1.04m
+    shield: changed 1.2% of 457,587 decisions, hover 0.0%, no safe command 438 times
+    recovery: needed by 57 drones, 57 of them arrived
+
+ 8  model/final + shield + recovery     3200  100.0% [99.9, 100.0]   0.0% [ 0.0,  0.1]      0.0%         0  1.180     1.01m
+    shield: changed 1.3% of 615,260 decisions, hover 0.0%, no safe command 671 times
+    recovery: needed by 81 drones, 81 of them arrived
+
+10  model/final + shield + recovery     4000  100.0% [99.9, 100.0]   0.0% [ 0.0,  0.1]      0.0%         0  1.174     1.03m
+    shield: changed 1.4% of 765,531 decisions, hover 0.0%, no safe command 940 times
+    recovery: needed by 86 drones, 86 of them arrived
+
+took 25.1 min

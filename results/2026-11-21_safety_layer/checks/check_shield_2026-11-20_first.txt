@@ -1,0 +1,66 @@
+shield checks 2026-11-20 03:38:29
+settings: margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s (default)
+
+--- 1 hand-worked cases (default settings) ---
+    ok   nothing near: unchanged (+1.00, +0.00, +0.00)
+    ok   wall 1.22 m ahead, stops 0.52 m on, 0.35 m left: unchanged (+1.00, +0.00, +0.00)
+    ok   wall 1.10 m ahead, full speed would leave 0.23 m; at 0.75 it stops 0.39 m on and leaves 0.36 m: changed (+0.75, +0.00, +0.00)
+    ok   box beside the path, 0.40 m from the drone: unchanged (+1.00, +0.00, +0.00)
+    ok   straight down from 1.2 m: full speed ends 0.265 m above the ground, at 0.75 it ends 0.411 m above: changed (+0.00, +0.00, -0.75)
+    ok   edge of the area at 15 m, from x = 14.0: stops at 14.52: unchanged (+1.00, +0.00, +0.00)
+    ok   edge of the area at 15 m, from x = 14.3: stops at 14.82: changed (+0.75, +0.00, +0.00)
+    ok   drone coming head on from 4 m: the command changes and the predicted pass is wider: changed (-0.23, +0.06, -0.06), closest 0.46 m -> 1.11 m
+    ok   drone flying alongside 5 m away: unchanged (+1.00, +0.00, +0.00)
+    ok   already 0.10 m from a wall: nothing is safe, so it must not get closer, and hovering is the closest such command: no_safe (+0.00, +0.00, +0.00), closest 0.100 m
+    ok   boxed in with 0.05 m to spare on every side: only hovering is safe: hover (+0.00, +0.00, +0.00)
+    ok   flying at a wall 1.08 m ahead, just far enough to brake: a safe command is found: hover (+0.00, +0.00, +0.00), closest 0.310 m
+PASS  (0.0 s)
+
+--- 2 the guarantee in the model, decision every 0.104 s ---
+    60 flights (20 to the target, of which 17 arrived; the rest random or aiming at the nearest box), 15,626 decisions
+    commands changed 1534, hover 5442, no safe command 0
+    closest any drone came to a box, the ground or the edge: 0.300 m (margin 0.30 m)
+PASS  (39.8 s)
+
+--- 2 the guarantee in the model, decision period varying by up to 12% (checked for 20%) ---
+    60 flights (20 to the target, of which 18 arrived; the rest random or aiming at the nearest box), 15,699 decisions
+    commands changed 1401, hover 5613, no safe command 0
+    closest any drone came to a box, the ground or the edge: 0.300 m (margin 0.30 m)
+PASS  (40.1 s)
+
+--- 3 the model against MuJoCo and Gazebo flights ---
+    mujoco, 1 and 3 drones: 100 drones, 18,624 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.036  0.130  0.429              0.086  0.284  0.800
+       0.30        0.025  0.093  0.323              0.066  0.224  0.666
+       0.40        0.018  0.067  0.248              0.051  0.173  0.546  <- settings
+       0.50        0.014  0.049  0.192              0.041  0.134  0.444
+       0.60        0.011  0.037  0.151              0.034  0.102  0.359
+    Gazebo, batch_20261119_210839_policy: 3 drones, 631 decisions
+        lag   after 0.5 s: median   95%    max   after 1 s: median   95%    max
+       0.20        0.045  0.122  0.278              0.084  0.237  0.468
+       0.30        0.041  0.096  0.227              0.079  0.199  0.401
+       0.40        0.040  0.088  0.191              0.074  0.175  0.347  <- settings
+       0.50        0.040  0.089  0.166              0.072  0.177  0.307
+       0.60        0.040  0.090  0.149              0.073  0.183  0.279
+    (metres; the guarantee needs the error to stay below the margin, 0.30 m)
+PASS  (33.0 s)
+
+--- 4 the policy without and with the shield, Gazebo scenarios in mujoco ---
+    policy /mnt/hgfs/thesis/anticollision/results/2026-11-15_swarm_sweep/model/final.zip (mujoco), 82 rays, 3 neighbours, decision every 0.104 s, 1.04 m/s level, 1.17 m/s climb
+    shield margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s, holds 0.083, 0.104, 0.125, 0.500 s
+     k                   drones reached  box drone other timeout   changed  hover no safe  time (s)  ms/check
+     1  policy               25      25    0     0     0       0        -      -       0      22.2         -
+     1  policy + shield      25      25    0     0     0       0      0.0%    0.0%       0      22.2      0.06
+     2  policy               50      46    4     0     0       0        -      -       0      19.7         -
+     2  policy + shield      50      50    0     0     0       0      0.8%    0.0%       3      19.6      0.09
+     3  policy               75      70    5     0     0       0        -      -       0      19.2         -
+     3  policy + shield      75      75    0     0     0       0      1.2%    0.0%       9      19.2      0.11
+     4  policy              100      93    7     0     0       0        -      -       0      20.0         -
+     4  policy + shield     100      97    0     0     0       3      4.4%    0.0%      20      20.5      0.16
+    (box, drone, other: crashes into a box, into another drone, and into the ground or out of the area; time: mean flight time of the drones that arrived)
+PASS  (135.1 s)
+
+all checks passed
+
+report written to /mnt/hgfs/thesis/anticollision/rl/logs/check_shield.txt

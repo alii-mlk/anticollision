@@ -1,0 +1,16 @@
+drones,controller,flights,arrived,%,95% interval,hit obstacle,hit drone,timed out,closest (m),changed %,recovered
+1,final policy,25,25,100.0,86.7 to 100.0,0,0,0,0.197,-,-
+1,with layer,25,25,100.0,86.7 to 100.0,0,0,0,0.362,0.00,-
+1,with layer and recovery,25,25,100.0,86.7 to 100.0,0,0,0,0.334,0.00,0
+2,final policy,50,50,100.0,92.9 to 100.0,0,0,0,0.068,-,-
+2,with layer,50,50,100.0,92.9 to 100.0,0,0,0,0.327,0.55,-
+2,with layer and recovery,50,50,100.0,92.9 to 100.0,0,0,0,0.333,0.49,0
+3,final policy,75,72,96.0,88.9 to 98.6,3,0,0,-0.006,-,-
+3,with layer,75,74,98.7,92.8 to 99.8,0,0,1,0.287,1.28,-
+3,with layer and recovery,75,75,100.0,95.1 to 100.0,0,0,0,0.280,0.75,1
+1 to 3,final policy,150,147,98.0,94.3 to 99.3,3,0,0,-0.006,-,-
+1 to 3,with layer,150,149,99.3,96.3 to 99.9,0,0,1,0.287,0.82,-
+1 to 3,with layer and recovery,150,150,100.0,97.5 to 100.0,0,0,0,0.280,0.52,1
+4,final policy,100,92,92.0,85.0 to 95.9,8,0,0,-0.019,-,-
+4,with layer,100,97,97.0,91.5 to 99.0,0,0,3,0.230,7.76,-
+4,with layer and recovery,100,100,100.0,96.3 to 100.0,0,0,0,0.078,1.63,5

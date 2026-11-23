@@ -6,6 +6,8 @@ __pycache__/
 # My own planning notes.
 ROADMAP.md
 RELATED_WORK.md
+STUDY_PLAN.md
+study/
 
 # Logs, generated scenarios and batch output. They are large and can be made
 # again from the seeds. The runs used in the thesis are copied to results/.

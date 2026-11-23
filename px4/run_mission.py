@@ -12,6 +12,15 @@ the two can be compared directly:
               drones' positions and velocities and its own state, and flies the chosen
               direction as an offboard velocity setpoint at the speeds the
               policy trained under. Needs the RL venv: source rl/env.sh.
+  --shield    with --policy: every command of the policy is first checked by
+              the safety layer (rl/shield.py), which replaces it when the
+              drone could not stop in time before a box, the ground, the edge
+              of the area or another drone. A JSON settings file, or
+              "default".
+  --recovery  with --shield: a drone that has not come closer to its target
+              for 8 s climbs over the boxes, flies level to the point above
+              its target and descends (rl/recovery.py). Its commands go
+              through the safety layer too.
 
 The run ends when the drone reaches its target, is destroyed by
 collision_monitor_3d.py (which disarms it), or the timeout expires.
@@ -40,6 +49,7 @@ Usage:
   ./run_mission.py --scenario scenarios3d/s1_n8_k1
   ./run_mission.py --scenario <dir> --out runs/r1 --timeout 180
   python run_mission.py --scenario <dir> --policy ../rl/runs/mujoco_1
+  python run_mission.py --scenario <dir> --policy ../rl/runs/swarm_4/final.zip --shield default
 """
 
 import argparse
@@ -62,6 +72,11 @@ from mavros_msgs.srv import CommandBool, SetMode
 from mavros_ns import resolve as resolve_mavros
 
 SETPOINT_RATE_HZ = 20.0
+# How often the node checks whether the policy is due for a decision. The
+# policy was trained to decide every 0.104 s. Checking only on the 20 Hz
+# setpoint tick made every decision wait for the third tick, so until
+# 2026-11-19 the policy decided every 0.15 s in Gazebo.
+POLICY_CHECK_HZ = 100.0
 PRESTREAM_SETPOINTS = 40      # ~2 s of setpoints before requesting OFFBOARD
 TAKEOFF_ALTITUDE = 3.0        # climb here first, then head for the target
 TAKEOFF_TOLERANCE = 0.8
@@ -145,13 +160,16 @@ def parse_scenario(path):
 class MissionRunner(Node):
     def __init__(self, start, target, tolerance, timeout, wall_timeout,
                  out_dir, mavros_ns, drone_id, n_drones=1, policy=None,
-                 boxes=None):
+                 boxes=None, shield=None, recovery=None):
         super().__init__("run_mission")
 
         self.start = start
         self.target_world = target
         self.policy = policy
         self.boxes = boxes
+        self.shield = shield
+        self.recovery = recovery
+        self.recovery_decisions = 0
         # PX4's local frame originates at the spawn point.
         self.target_local = tuple(t - s for t, s in zip(target, start))
         self.tolerance = tolerance
@@ -207,6 +225,12 @@ class MissionRunner(Node):
         self.others_destroyed = {}
         self.decisions = 0
         self.last_decision = None
+        self.first_decision = None
+        self.next_decision = None
+        # One row per decision: time, world position, measured velocity and
+        # the velocity commanded, to compare how well each simulator follows
+        # the commands (rl/compare_simulators.py).
+        self.decision_log = []
         self.velocity_cmd = (0.0, 0.0, 0.0)
         if self.policy is not None:
             # MAVROS reports this in the local frame, whose axes are the
@@ -227,6 +251,10 @@ class MissionRunner(Node):
             self.velocity_pub = self.create_publisher(
                 TwistStamped, f"{ns}/setpoint_velocity/cmd_vel", 10)
             self.get_logger().info(f"Flying with policy {self.policy.describe()}")
+            if self.shield is not None:
+                self.get_logger().info(f"Safety layer on: {self.shield.describe()}")
+            if self.recovery is not None:
+                self.get_logger().info("Recovery on: a stuck drone climbs over the boxes")
 
         self.sent = 0
         self.elapsed = 0.0        # simulated seconds since the run started
@@ -255,6 +283,8 @@ class MissionRunner(Node):
         # network's cost would not be measured anywhere.
         self.cpu_start = time.process_time()
         self.timer = self.create_timer(1.0 / SETPOINT_RATE_HZ, self.tick)
+        if self.policy is not None:
+            self.policy_timer = self.create_timer(1.0 / POLICY_CHECK_HZ, self.policy_tick)
 
         self.get_logger().info(
             f"Mission: world target ({target[0]:.2f}, {target[1]:.2f}, "
@@ -305,10 +335,23 @@ class MissionRunner(Node):
         return cmd
 
     def steer(self):
-        """Ask the policy where to go, at the rate it was trained to decide."""
-        if (self.last_decision is not None
-                and self.elapsed - self.last_decision < self.policy.decision_dt):
-            return
+        """Ask the policy where to go, at the rate it was trained to decide.
+
+        Decisions are due on a fixed grid of simulated time, one every
+        decision_dt from the first one, so their average period is the
+        trained one even though they can only happen on a timer tick.
+        Returns True when a new decision was made.
+        """
+        if self.next_decision is not None and self.elapsed < self.next_decision:
+            return False
+        if self.next_decision is None:
+            self.first_decision = self.elapsed
+            self.next_decision = self.elapsed
+        self.next_decision += self.policy.decision_dt
+        if self.next_decision <= self.elapsed:
+            # More than a whole period was missed (the node was held up), so
+            # start the grid again instead of deciding several times at once.
+            self.next_decision = self.elapsed + self.policy.decision_dt
         self.last_decision = self.elapsed
         world = tuple(p + s for p, s in zip(self.local_pos, self.start))
         # Every other drone is in the lidar, wrecks included. Only the ones
@@ -320,8 +363,43 @@ class MissionRunner(Node):
             list(self.others.values()),
             neighbours=[self.others[j] for j in flying],
             neighbour_velocities=[self.others_vel.get(j, (0.0, 0.0, 0.0)) for j in flying])
-        self.velocity_cmd = tuple(self.policy.velocity(self.policy.action(obs)))
+        action = self.policy.action(obs)
+        what, mode = "-", "policy"
+        if self.recovery is not None:
+            action, mode = self.recovery.action(self.elapsed, world, action)
+            self.recovery_decisions += mode == "recovery"
+        if self.shield is not None:
+            wrecks = [p for j, p in self.others.items() if self.others_destroyed.get(j, False)]
+            action, what = self.shield.filter(
+                action, world, self.vel, self.boxes,
+                others_pos=[self.others[j] for j in flying],
+                others_vel=[self.others_vel.get(j, (0.0, 0.0, 0.0)) for j in flying],
+                wrecks=wrecks)
+        self.velocity_cmd = tuple(float(c) for c in self.policy.velocity(action))
         self.decisions += 1
+        self.decision_log.append((self.elapsed, *world, *self.vel, *self.velocity_cmd, what, mode))
+        return True
+
+    def policy_tick(self):
+        """Check often whether a decision is due, and send it at once.
+
+        Only used with the simulator's clock. Without it the elapsed time
+        moves only on the 20 Hz tick, and so do the decisions.
+        """
+        if (self.outcome is not None or self.destroyed or not self.climbed
+                or self.local_pos is None or self.sim_now is None
+                or self.sim_start is None):
+            return
+        self.elapsed = self.sim_now - self.sim_start
+        if self.steer():
+            self.velocity_pub.publish(self.make_velocity(self.velocity_cmd))
+
+    @property
+    def decision_period(self):
+        """Average simulated time between two decisions, or None."""
+        if self.decisions < 2:
+            return None
+        return (self.last_decision - self.first_decision) / (self.decisions - 1)
 
     def advance_time(self):
         """Update elapsed simulated time and elapsed wall-clock time."""
@@ -461,6 +539,13 @@ class MissionRunner(Node):
                 c, v = self.velocity_cmd, self.vel
                 steering = (f" cmd=({c[0]:.2f}, {c[1]:.2f}, {c[2]:.2f}) "
                             f"speed={math.hypot(*v):.2f} m/s decisions={self.decisions}")
+                if self.shield is not None:
+                    n = self.shield.counts
+                    steering += (f" shield changed={n['changed']} hover={n['hover']} "
+                                 f"no_safe={n['no_safe']}")
+                if self.recovery is not None and self.recovery.cruise is not None:
+                    steering += f" recovery cruise={self.recovery.cruise:.1f} m"
+
             self.get_logger().info(
                 f"mode={self.state.mode} armed={self.state.armed} "
                 f"world=({w[0]:.1f}, {w[1]:.1f}, {w[2]:.1f}) "
@@ -533,11 +618,33 @@ class MissionRunner(Node):
         w = self.raw_world or (0.0, 0.0, 0.0)
         controller = "straight" if self.policy is None else "policy"
         policy_file = "-" if self.policy is None else str(self.policy.model_file)
+        if self.shield is not None:
+            s, n = self.shield.settings, self.shield.counts
+            shield_lines = (
+                f"shield: on\n"
+                f"shield_margin: {s.margin:.3f}\n"
+                f"shield_drone_margin: {s.drone_margin:.3f}\n"
+                f"shield_lookahead: {s.lookahead:.3f}\n"
+                f"shield_lag: {s.lag:.3f}\n"
+                f"shield_changed: {n['changed']}\n"
+                f"shield_hover: {n['hover']}\n"
+                f"shield_no_safe: {n['no_safe']}\n")
+        else:
+            shield_lines = "shield: off\n"
+        if self.recovery is not None:
+            shield_lines += (f"recovery: on\n"
+                             f"recovery_started: {self.recovery.started}\n"
+                             f"recovery_decisions: {self.recovery_decisions}\n")
+        else:
+            shield_lines += "recovery: off\n"
         (self.out_dir / "mission.yaml").write_text(
             f"outcome: {self.outcome}\n"
             f"controller: {controller}\n"
             f"policy: {policy_file}\n"
+            f"{shield_lines}"
             f"policy_decisions: {self.decisions}\n"
+            f"decision_period: "
+            f"{'-' if self.decision_period is None else f'{self.decision_period:.4f}'}\n"
             f"cpu_time: {time.process_time() - self.cpu_start:.2f}\n"
             f"euclidean_distance: {self.euclidean:.3f}\n"
             f"travelled_distance: {self.travelled:.3f}\n"
@@ -554,6 +661,15 @@ class MissionRunner(Node):
             f"target_world_position: {{x: {self.target_world[0]:.3f}, "
             f"y: {self.target_world[1]:.3f}, z: {self.target_world[2]:.3f}}}\n"
         )
+        if self.decision_log:
+            # shield: what the safety layer did with the command (unchanged,
+            # changed, hover, no_safe), "-" without it. mode: who chose the
+            # command, the policy or the recovery.
+            with open(self.out_dir / "decisions.csv", "w") as f:
+                f.write("t,x,y,z,vx,vy,vz,cmd_x,cmd_y,cmd_z,shield,mode\n")
+                for row in self.decision_log:
+                    f.write(f"{row[0]:.3f}," + ",".join(f"{v:.3f}" for v in row[1:10])
+                            + f",{row[10]},{row[11]}\n")
         with open(self.out_dir / "trajectory.csv", "w") as f:
             f.write("t,x,y,z\n")
             for t, x, y, z in self.trajectory:
@@ -579,7 +695,16 @@ def main():
     ap.add_argument("--policy", type=Path, default=None,
                     help="fly with a trained policy: an rl/runs/<name> directory "
                          "(uses its best.zip) or a model .zip inside one")
+    ap.add_argument("--shield", default=None,
+                    help="with --policy: check every command with the safety layer "
+                         "(rl/shield.py), a JSON settings file or 'default'")
+    ap.add_argument("--recovery", action="store_true",
+                    help="with --shield: a stuck drone climbs over the boxes (rl/recovery.py)")
     args = ap.parse_args()
+    if args.shield is not None and args.policy is None:
+        sys.exit("--shield needs --policy")
+    if args.recovery and args.shield is None:
+        sys.exit("--recovery needs --shield")
 
     scenario_file = args.scenario / "scenario.yaml"
     if not scenario_file.exists():
@@ -594,17 +719,25 @@ def main():
     wall_timeout = (args.wall_timeout
                     or args.timeout * DEFAULT_WALL_TIMEOUT_FACTOR)
 
-    policy = boxes = None
+    policy = boxes = shield = recovery = None
     if args.policy is not None:
         policy = load_policy(args.policy)
         from lidar import boxes_from_scenario
         boxes = boxes_from_scenario(scenario_file)
+    if args.shield is not None:
+        from shield import Shield, ShieldSettings
+        shield = Shield(ShieldSettings.load(args.shield), decision_dt=policy.decision_dt,
+                        speed_xy=policy.speed_xy, speed_z=policy.speed_z,
+                        radius=policy.radius)
+    if args.recovery:
+        from recovery import Recovery
+        recovery = Recovery(d["target"], boxes, shield.settings.margin, radius=policy.radius)
 
     rclpy.init()
     node = MissionRunner(d["start"], d["target"], args.tolerance,
                          args.timeout, wall_timeout, out_dir,
                          args.mavros_ns, args.drone_id, n_drones=len(drones),
-                         policy=policy, boxes=boxes)
+                         policy=policy, boxes=boxes, shield=shield, recovery=recovery)
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, SystemExit):

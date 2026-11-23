@@ -1,0 +1,18 @@
+large evaluation 2026-11-22 15:27:49, mujoco flight model, 400 mazes per number of drones, seeds from 300000, decision every 0.104 s
+shield: margin 0.30 m, drone margin 0.40 m, look-ahead 0.50 s, lag 0.40 s (default), with the recovery
+
+ k  policy                           flights  reached              crashed               timeout hit drone  ratio clearance
+---------------------------------------------------------------------------------------------------------------------------
+15  model/final                         6000   95.2% [94.6, 95.7]    4.5% [ 4.0,  5.1]      0.3%        10  1.163     1.00m
+15  model/final + shield + recovery     6000  100.0% [99.9, 100.0]   0.0% [ 0.0,  0.1]      0.0%         0  1.182     0.99m
+    shield: changed 1.7% of 1,159,438 decisions, hover 0.0%, no safe command 2684 times
+    recovery: needed by 114 drones, 114 of them arrived
+    (36 of 400 mazes redrawn with a new seed and the same number of boxes, see --redraw)
+
+20  model/final                         8000   94.8% [94.3, 95.3]    4.9% [ 4.4,  5.4]      0.3%        20  1.165     0.95m
+20  model/final + shield + recovery     8000  100.0% [100.0, 100.0]  0.0% [ 0.0,  0.0]      0.0%         0  1.186     0.93m
+    shield: changed 2.0% of 1,566,388 decisions, hover 0.0%, no safe command 5749 times
+    recovery: needed by 162 drones, 162 of them arrived
+    (191 of 400 mazes redrawn with a new seed and the same number of boxes, see --redraw)
+
+took 44.4 min

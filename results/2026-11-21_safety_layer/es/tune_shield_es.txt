@@ -1,0 +1,26 @@
+ES tuning of the safety layer, 2026-11-20 13:26:06
+policy /mnt/hgfs/thesis/anticollision/results/2026-11-15_swarm_sweep/model/final.zip
+ranges: margin 0.1-0.8, drone_margin 0.1-1.0, lookahead 0.1-1.5, lag 0.2-1.0
+start: margin 0.300 m, drone margin 0.400 m, look-ahead 0.500 s, lag 0.400 s (default)
+24 iterations of 6 mirrored pairs, sigma 0.1, alpha 0.02; score per flight: 1 if it arrives, -10 if it crashes, -0.01 per second
+tuning mazes: seeds from 400000, 24 per number of drones, drones [2, 4, 8]
+
+iteration 0: margin 0.300 m, drone margin 0.400 m, look-ahead 0.500 s, lag 0.400 s
+    score +0.7946: arrived 334/336, crashed 0, timeout 2, time 19.69 s, changed 0.98%, closest 0.297 m
+    perturbed settings: best +0.7988, worst +0.7946; step 0.0534; 7.2 min
+
+iteration 1: margin 0.310 m, drone margin 0.421 m, look-ahead 0.546 s, lag 0.425 s
+    score +0.7989: arrived 335/336, crashed 0, timeout 1, time 19.69 s, changed 1.14%, closest 0.308 m
+    perturbed settings: best +0.7988, worst +0.7911; step 0.0361; 7.6 min
+
+iteration 2: margin 0.290 m, drone margin 0.431 m, look-ahead 0.548 s, lag 0.411 s
+    score +0.7948: arrived 334/336, crashed 0, timeout 2, time 19.67 s, changed 1.03%, closest 0.288 m
+    perturbed settings: best +0.7988, worst +0.7949; step 0.0449; 7.8 min
+
+iteration 3: margin 0.278 m, drone margin 0.462 m, look-ahead 0.580 s, lag 0.413 s
+    score +0.7988: arrived 335/336, crashed 0, timeout 1, time 19.70 s, changed 1.03%, closest 0.275 m
+    perturbed settings: best +0.7993, worst +0.7948; step 0.0423; 7.9 min
+
+iteration 4: margin 0.256 m, drone margin 0.445 m, look-ahead 0.567 s, lag 0.427 s
+    score +0.7985: arrived 335/336, crashed 0, timeout 1, time 19.72 s, changed 0.95%, closest 0.254 m
+    perturbed settings: best +0.7992, worst +0.7948; step 0.0555; 8.3 min

@@ -13,14 +13,16 @@ only what the thesis uses is copied here.
 | `2026-09-06_3d_sweep/` | 2 | PX4, 75 runs with 4 to 20 obstacles and 1 to 3 drones, flying straight (the baseline) |
 | `2026-10-19_rl_sweep/` | 3 | the same 75 runs flown straight again and with the first policy, trained with one drone |
 | `2026-11-15_swarm_sweep/` | 4 | the policy trained with many drones: MuJoCo with 1 to 10 drones, Gazebo with 1 to 4 drones, CPU and memory |
-| `thesis/` | | the tables and figures for the thesis, made by the two scripts below |
+| `2026-11-21_safety_layer/` | 5 | the same policy with the safety layer and the recovery: the decision timing fix, Gazebo and MuJoCo compared drone by drone, the evolution strategy run, the final tests |
+| `tables/` | | every table of the thesis as CSV, and all of them as text in `all_tables.txt` |
+| `figures/` | | every figure of the thesis as PDF and PNG |
 
 The two scripts:
 
-- `make_tables.py` reads the folders above and writes `thesis/tables.txt`
-  (all tables as text) and `thesis/tables/*.csv`. It only needs the Python
+- `make_tables.py` reads the folders above and writes `tables/all_tables.txt`
+  (all tables as text) and `tables/*.csv`. It only needs the Python
   standard library: `python3 results/make_tables.py`.
-- `make_figures.py` draws `thesis/figures/*.pdf` and `*.png` from the same
+- `make_figures.py` draws `figures/*.pdf` and `*.png` from the same
   data. It needs matplotlib, which is in the RL environment:
   `source rl/env.sh`, then `python results/make_figures.py`.
 

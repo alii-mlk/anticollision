@@ -101,7 +101,22 @@ def main():
     ap.add_argument("--policy", type=Path, default=None,
                     help="fly every drone with this trained policy "
                          "(an rl/runs/<name> directory); default: straight")
+    ap.add_argument("--shield", default=None,
+                    help="with --policy: check every command with the safety layer "
+                         "(rl/shield.py), a JSON settings file or 'default'")
+    ap.add_argument("--recovery", action="store_true",
+                    help="with --shield: a stuck drone climbs over the boxes (rl/recovery.py)")
     args = ap.parse_args()
+
+    if args.recovery and args.shield is None:
+        sys.exit("--recovery needs --shield")
+    if args.shield is not None:
+        if args.policy is None:
+            sys.exit("--shield needs --policy")
+        if args.shield != "default":
+            args.shield = str(Path(args.shield).expanduser().resolve())
+            if not Path(args.shield).exists():
+                sys.exit(f"shield settings not found: {args.shield}")
 
     if args.policy is not None:
         # The missions run with this same interpreter, so check here, once,
@@ -139,6 +154,8 @@ def main():
     print(f"Timeout:  {args.timeout:.0f} s simulated, "
           f"{wall_timeout:.0f} s wall clock")
     print(f"Flying:   {'policy ' + str(args.policy) if args.policy else 'straight (no avoidance)'}")
+    if args.shield is not None:
+        print(f"Shield:   {args.shield}{', with the recovery' if args.recovery else ''}")
     print()
 
     monitors, missions, out_dirs = [], [], []
@@ -169,6 +186,10 @@ def main():
     time.sleep(3)
 
     policy_args = ["--policy", str(args.policy)] if args.policy else []
+    if args.shield is not None:
+        policy_args += ["--shield", args.shield]
+    if args.recovery:
+        policy_args += ["--recovery"]
     for i in range(k):
         missions.append(subprocess.Popen(
             [sys.executable, str(MISSION),
@@ -285,6 +306,8 @@ def main():
     (out_root / "summary.yaml").write_text(
         f"controller: {'policy' if args.policy else 'straight'}\n"
         f"policy: {args.policy or '-'}\n"
+        f"shield: {args.shield or 'off'}\n"
+        f"recovery: {'on' if args.recovery else 'off'}\n"
         f"k_drones: {len(rows)}\n"
         f"reached: {reached}\n"
         f"collisions: {collisions}\n"

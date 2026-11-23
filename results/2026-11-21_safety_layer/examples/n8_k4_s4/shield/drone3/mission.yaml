@@ -1,0 +1,24 @@
+outcome: timeout
+controller: policy
+policy: /mnt/hgfs/thesis/anticollision/rl/runs/swarm_4/final.zip
+shield: on
+shield_margin: 0.300
+shield_drone_margin: 0.400
+shield_lookahead: 0.500
+shield_lag: 0.400
+shield_changed: 550
+shield_hover: 1
+shield_no_safe: 68
+policy_decisions: 1657
+decision_period: 0.1042
+cpu_time: 62.10
+euclidean_distance: 12.691
+travelled_distance: 110.175
+ratio: 8.681
+simulation_time: 180.04
+wall_time: 192.55
+real_time_factor: 0.935
+clock_source: gazebo
+sim_start: 71.456
+final_world_position: {x: -5.194, y: 3.276, z: 3.869}
+target_world_position: {x: -7.733, y: -0.634, z: 2.536}

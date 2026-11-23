@@ -300,7 +300,7 @@ all     straight         13600       43.9  43.1 to 44.7       56.1        804   
 all     trained alone    13600       78.9  78.2 to 79.6       20.5        740         5.44       5.84        0.5       1.105      0.100                  0.61
 all     final policy     13600       95.2  94.8 to 95.5        4.3          0         0.00       0.03        0.5       1.152      0.143                  1.07
 
-The mazes have 0, 5, 10, 15 or 20 obstacles and were not used to train or to choose any policy.
+The mazes have 4, 8, 12, 16 or 20 obstacles and were not used to train or to choose any policy.
 Crashed: hit an obstacle, another drone or the ground, or left the area. Hit drone is the part of crashed that was another drone.
 At most: the upper end of the 95% interval of the hit drone share.
 
@@ -316,3 +316,183 @@ final policy       3       75                 70                 72
 
 MuJoCo is the simulator the policy was trained in, Gazebo with PX4 the one it is tested in.
 For 2 drones see mujoco/check_swarm_swarm_4.txt.
+
+
+Table 15. Gazebo with the safety layer: the same 100 scenarios, every drone deciding every 0.104 s
+
+drones  controller               flights  arrived      %  95% interval   hit obstacle  hit drone  timed out  closest (m)  changed %  recovered
+----------------------------------------------------------------------------------------------------------------------------------------------
+1       final policy                  25       25  100.0  86.7 to 100.0             0          0          0        0.197          -          -
+1       with layer                    25       25  100.0  86.7 to 100.0             0          0          0        0.362       0.00          -
+1       with layer and recovery       25       25  100.0  86.7 to 100.0             0          0          0        0.334       0.00          0
+
+2       final policy                  50       50  100.0  92.9 to 100.0             0          0          0        0.068          -          -
+2       with layer                    50       50  100.0  92.9 to 100.0             0          0          0        0.327       0.55          -
+2       with layer and recovery       50       50  100.0  92.9 to 100.0             0          0          0        0.333       0.49          0
+
+3       final policy                  75       72   96.0  88.9 to 98.6              3          0          0       -0.006          -          -
+3       with layer                    75       74   98.7  92.8 to 99.8              0          0          1        0.287       1.28          -
+3       with layer and recovery       75       75  100.0  95.1 to 100.0             0          0          0        0.280       0.75          1
+
+1 to 3  final policy                 150      147   98.0  94.3 to 99.3              3          0          0       -0.006          -          -
+1 to 3  with layer                   150      149   99.3  96.3 to 99.9              0          0          1        0.287       0.82          -
+1 to 3  with layer and recovery      150      150  100.0  97.5 to 100.0             0          0          0        0.280       0.52          1
+
+4       final policy                 100       92   92.0  85.0 to 95.9              8          0          0       -0.019          -          -
+4       with layer                   100       97   97.0  91.5 to 99.0              0          0          3        0.230       7.76          -
+4       with layer and recovery      100      100  100.0  96.3 to 100.0             0          0          0        0.078       1.63          5
+
+Closest: the smallest gap between a drone and an obstacle over all drones of the row; 0 or less means it touched.
+Changed: commands the layer replaced, in % of the decisions. Recovered: drones the recovery flew for a while.
+The policy alone was flown again with the fixed timing, so these runs differ a little from the stage 4 tables.
+
+
+Table 16. Gazebo: the same drone in the same scenario with each controller
+
+drones  final policy  with layer  with layer and recovery  flights
+------------------------------------------------------------------
+1       arrived       arrived     arrived                       25
+
+2       arrived       arrived     arrived                       50
+
+3       arrived       arrived     arrived                       72
+3       crashed       arrived     arrived                        2
+3       crashed       timed out   arrived                        1
+
+1 to 3  arrived       arrived     arrived                      147
+1 to 3  crashed       arrived     arrived                        2
+1 to 3  crashed       timed out   arrived                        1
+
+4       arrived       arrived     arrived                       92
+4       crashed       arrived     arrived                        5
+4       crashed       timed out   arrived                        3
+
+Every pattern that occurred, with how many drones had it.
+
+
+Table 17. MuJoCo with the safety layer: the 13,600 flights of the final evaluation
+
+drones  controller               flights  arrived %  95% interval    crashed  hit drone  timed out  crashes at most %  ratio mean  closest (m)  changed %  recovered
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1       final policy                 400       93.8  90.9 to 95.7         23          0          2              8.480       1.133       -0.011          -          -
+1       with layer                   400       99.0  97.5 to 99.6          0          0          4              0.951       1.140        0.294       1.78          -
+1       with layer and recovery      400      100.0  99.0 to 100.0         0          0          0              0.951       1.148        0.294       1.29          6
+
+2       final policy                 800       95.9  94.3 to 97.0         28          0          5              5.012       1.141       -0.020          -          -
+2       with layer                   800       98.8  97.7 to 99.3          0          0         10              0.478       1.146        0.296       1.39          -
+2       with layer and recovery      800      100.0  99.5 to 100.0         0          0          0              0.478       1.159        0.296       1.05         22
+
+3       final policy                1200       95.7  94.4 to 96.7         47          0          5              5.169       1.141       -0.016          -          -
+3       with layer                  1200       99.3  98.7 to 99.7          0          0          8              0.319       1.145        0.295       1.12          -
+3       with layer and recovery     1200      100.0  99.7 to 100.0         0          0          0              0.319       1.153        0.295       1.02         18
+
+4       final policy                1600       96.2  95.1 to 97.0         50          0         11              4.096       1.147       -0.016          -          -
+4       with layer                  1600       99.1  98.5 to 99.5          0          0         14              0.240       1.152        0.296       1.15          -
+4       with layer and recovery     1600      100.0  99.8 to 100.0         0          0          0              0.240       1.163        0.296       1.02         37
+
+6       final policy                2400       94.3  93.3 to 95.2        120          0         17              5.946       1.147       -0.017          -          -
+6       with layer                  2400       98.9  98.4 to 99.3          0          0         26              0.160       1.157        0.212       1.51          -
+6       with layer and recovery     2400      100.0  99.8 to 100.0         0          0          0              0.160       1.169        0.212       1.24         57
+
+8       final policy                3200       94.9  94.1 to 95.6        154          0         10              5.610       1.160       -0.016          -          -
+8       with layer                  3200       99.5  99.2 to 99.7          0          0         17              0.120       1.171        0.294       1.48          -
+8       with layer and recovery     3200      100.0  99.9 to 100.0         0          0          0              0.120       1.180        0.294       1.33         81
+
+10      final policy                4000       95.3  94.7 to 96.0        167          0         19              4.840       1.157       -0.019          -          -
+10      with layer                  4000       99.2  98.9 to 99.5          0          0         30              0.096       1.164        0.295       1.57          -
+10      with layer and recovery     4000      100.0  99.9 to 100.0         0          0          0              0.096       1.174        0.295       1.37         86
+
+all     final policy               13600       95.2  94.8 to 95.5        589          0         69              4.686       1.152       -0.020          -          -
+all     with layer                 13600       99.2  99.0 to 99.3          0          0        109              0.028       1.160        0.212       1.45          -
+all     with layer and recovery    13600      100.0  100.0 to 100.0        0          0          0              0.028       1.170        0.212       1.24        307
+
+The same 400 mazes per number of drones as the MuJoCo evaluation table (seeds from 300000).
+Crashed: hit an obstacle, another drone or the ground, or left the area (26 of the 589 flights of the final policy left the area).
+Crashes at most: upper end of the 95% interval of the share that crashed. With no crash in 13,600 flights it is 0.028%.
+A flight in MuJoCo ends after 600 decisions (62.5 s), in Gazebo after 180 s.
+
+
+Table 18. MuJoCo: the same flight with each controller
+
+final policy  with layer  with layer and recovery  flights
+----------------------------------------------------------
+arrived       arrived     arrived                    12926
+crashed       arrived     arrived                      555
+timed out     timed out   arrived                       59
+crashed       timed out   arrived                       34
+arrived       timed out   arrived                       16
+timed out     arrived     arrived                       10
+
+All 13,600 flights, 1 to 10 drones. Crashed includes leaving the area.
+
+
+Table 19. The final policy on the 100 Gazebo scenarios, flown again in MuJoCo drone by drone
+
+timing                           drones  flights  same outcome  arrived in both  only in Gazebo  only in MuJoCo  in neither  McNemar p
+--------------------------------------------------------------------------------------------------------------------------------------
+decision every 0.15 s in Gazebo  1            25            25               25               0               0           0      1.000
+decision every 0.15 s in Gazebo  2            50            46               46               4               0           0      0.125
+decision every 0.15 s in Gazebo  3            75            73               70               2               0           3      0.500
+decision every 0.15 s in Gazebo  4           100            96               91               2               2           5      1.000
+decision every 0.15 s in Gazebo  all         250           240              232               8               2           8      0.109
+
+decision every 0.104 s in both   1            25            25               25               0               0           0      1.000
+decision every 0.104 s in both   2            50            46               46               4               0           0      0.125
+decision every 0.104 s in both   3            75            73               70               2               0           3      0.500
+decision every 0.104 s in both   4           100            97               91               1               2           6      1.000
+decision every 0.104 s in both   all         250           241              232               7               2           9      0.180
+
+Same starts, targets and obstacles in both simulators. MuJoCo always decides every 0.104 s.
+McNemar p: exact two-sided test on the drones that differ. Above 0.05 the split between the two columns is what chance would give.
+
+
+Table 20. What the safety layer and the recovery cost a drone that arrives with every controller
+
+simulator  drones   flights  time policy (s)  time layer (s)  time recovery (s)  ratio policy  ratio layer  ratio recovery  cpu policy (%)  cpu layer (%)  cpu recovery (%)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Gazebo     1             25            31.06           31.14              31.14         1.188        1.188           1.188            15.2           15.1              14.8
+Gazebo     2             50            27.89           27.82              27.87         1.188        1.189           1.188            22.1           24.4              19.6
+Gazebo     3             72            27.59           27.56              27.54         1.234        1.230           1.232            29.1           30.2              24.9
+Gazebo     1 to 3       147            28.28           28.26              28.27         1.211        1.209           1.209            24.3           25.7              21.4
+Gazebo     4             92            28.06           28.10              28.35         1.261        1.261           1.263            32.1           32.1              27.7
+
+MuJoCo     1 to 10    12926            19.43           19.48              19.50         1.151        1.153           1.155               -              -                 -
+
+Only drones that arrived with all three, same drone and same scenario. Time: flight time, mean. Ratio: travelled over straight-line distance, mean.
+Cpu: processor time of the drone's mission node (lidar, network, layer) in % of one core.
+
+
+Table 21. Evolution strategy on the safety layer's settings, ordinary tuning mazes
+
+iteration  margin (m)  drone margin (m)  look-ahead (s)  lag (s)   score  arrived  crashed  timed out  best tried  worst tried
+------------------------------------------------------------------------------------------------------------------------------
+        0       0.300             0.400           0.500    0.400  0.7946  334/336        0          2      0.7988       0.7946
+        1       0.310             0.421           0.546    0.425  0.7989  335/336        0          1      0.7988       0.7911
+        2       0.290             0.431           0.548    0.411  0.7948  334/336        0          2      0.7988       0.7948
+        3       0.278             0.463           0.580    0.413  0.7988  335/336        0          1      0.7993       0.7948
+        4       0.256             0.445           0.567    0.427  0.7985  335/336        0          1      0.7992       0.7948
+
+Salimans et al. (2017), Algorithm 1 with mirrored sampling and centred ranks: 6 pairs of settings per iteration around the current one, 336 flights each (24 mazes for 2, 4 and 8 drones, seeds from 400000).
+Score per flight: 1 if it arrives, -10 if it crashes, -0.01 per second. Stopped after the iterations shown: every setting tried scored within 0.01 of the others.
+
+
+Table 22. MuJoCo with 15 and 20 drones in the same area
+
+drones  controller               flights  arrived %  95% interval    crashed  hit drone  timed out  crashes at most %  ratio mean  closest (m)  changed %  recovered
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+15      final policy                6000       95.2  94.6 to 95.7        270         10         19              5.054       1.163       -0.018          -          -
+15      with layer                  6000       99.3  99.1 to 99.5          0          0         41              0.064       1.173        0.135       1.88          -
+15      with layer and recovery     6000      100.0  99.9 to 100.0         0          0          0              0.064       1.182        0.135       1.69        114
+
+20      final policy                8000       94.8  94.3 to 95.3        391         20         22              5.382       1.165       -0.020          -          -
+20      with layer                  8000       99.5  99.3 to 99.6          0          0         41              0.048       1.179        0.171       2.17          -
+20      with layer and recovery     8000      100.0  100.0 to 100.0        0          0          0              0.048       1.186        0.171       2.05        162
+
+both    final policy               14000       95.0  94.6 to 95.3        661         30         41              5.085       1.164       -0.020          -          -
+both    with layer                 14000       99.4  99.3 to 99.5          0          0         82              0.027       1.177        0.135       2.04          -
+both    with layer and recovery    14000      100.0  100.0 to 100.0        0          0          0              0.027       1.184        0.135       1.89        276
+
+400 mazes with 15 drones, seeds from 300000 as in the final evaluation; 36 of them could not be built for 15 drones and were drawn again with a new seed and the same number of boxes.
+400 mazes with 20 drones, seeds from 300000 as in the final evaluation; 191 of them could not be built for 20 drones and were drawn again with a new seed and the same number of boxes.
+Hit drone counts drones, so every contact between two drones counts twice.
+Closest: the smallest gap to an obstacle, the ground or another drone over all flights of the row.
